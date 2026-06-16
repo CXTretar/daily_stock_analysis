@@ -124,7 +124,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
     def test_default_install_spec_is_commit_pinned(self) -> None:
         self.assertRegex(
             DEFAULT_ALPHASIFT_TEST_SPEC,
-            r"^git\+https://github\.com/ZhuLinsen/alphasift\.git@[0-9a-f]{40}$",
+            r"^git\+https://github\.com/CXTretar/alphasift\.git@[0-9a-f]{40}$",
         )
 
     def test_status_defaults_to_disabled(self) -> None:
