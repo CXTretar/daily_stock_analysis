@@ -144,6 +144,11 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594` | ✅ |
+| `STOCK_SELECTION_ENABLED` | Scheduled GitHub Actions stock-selection switch. When `true`, scheduled runs screen with AlphaSift first and override the run-local `STOCK_LIST`; for manual runs use `mode=stock-selection` instead | Optional |
+| `STOCK_SELECTION_STRATEGY` | AlphaSift strategy ID, default `dual_low`; available strategies are visible in the Web screening page or `/api/v1/alphasift/strategies` | Optional |
+| `STOCK_SELECTION_MARKET` | Stock-selection market, default `cn`; the current Web screening page exposes CN A-shares | Optional |
+| `STOCK_SELECTION_MAX_RESULTS` | Number of selected candidates entering full stock analysis, default `3`, to limit data-source and LLM runtime cost | Optional |
+| `STOCK_SELECTION_REQUIRE_BUY` | Final report filter for stock-selection runs, default `true`; only stocks whose final main analysis has `decision_type=buy` are kept | Optional |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
@@ -177,8 +182,10 @@ To get started quickly, you need at minimum:
 1. Go to `Actions` tab
 2. Select `Daily Stock Analysis` workflow on the left
 3. Click `Run workflow` button on the right
-4. Select run mode
+4. Select run mode: `full`, `market-only`, `stocks-only`, or `stock-selection`
 5. Click green `Run workflow` to confirm
+
+`stock-selection` is the dedicated manual screening entry: it forces AlphaSift screening, uses the selected candidates as the run-local stock list, and runs stock analysis only. Fixed watchlist analysis still uses `stocks-only`; manual `full` / `stocks-only` runs do not switch to screening just because repository variable `STOCK_SELECTION_ENABLED=true` exists.
 
 ### 5. Done!
 

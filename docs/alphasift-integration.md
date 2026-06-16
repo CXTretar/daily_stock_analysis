@@ -204,9 +204,10 @@ STOCK_SELECTION_ENABLED=true
 STOCK_SELECTION_STRATEGY=dual_low
 STOCK_SELECTION_MARKET=cn
 STOCK_SELECTION_MAX_RESULTS=3
+STOCK_SELECTION_REQUIRE_BUY=true
 ```
 
-`scripts/run_alphasift_screen.py` 会在本次进程内开启 AlphaSift，因此 Actions 自动选股只需设置 `STOCK_SELECTION_ENABLED=true`；`ALPHASIFT_ENABLED=true` 仍用于 Web/API 选股入口。`STOCK_SELECTION_MAX_RESULTS` 默认 3，用于限制进入完整分析链路的候选数量，避免 GitHub Actions 中全市场快照、新闻补全和 LLM 重排耗时过长。`mode=market-only` 时 workflow 会跳过自动选股；`stocks-only` 和 `full` 会使用选股结果覆盖本次 `STOCK_LIST`。若自动选股失败或没有候选，workflow 会失败，不会静默回退到旧 `STOCK_LIST`，避免把固定自选股误认为推荐结果。
+`scripts/run_alphasift_screen.py` 会在本次进程内开启 AlphaSift，因此 Actions 自动选股只需设置 `STOCK_SELECTION_ENABLED=true`；`ALPHASIFT_ENABLED=true` 仍用于 Web/API 选股入口。`STOCK_SELECTION_MAX_RESULTS` 默认 3，用于限制进入完整分析链路的候选数量，避免 GitHub Actions 中全市场快照、新闻补全和 LLM 重排耗时过长。`STOCK_SELECTION_REQUIRE_BUY` 默认 `true`，会在主分析完成后只保留最终 `decision_type=buy` 的股票进入本地报告和通知；设为 `false` 可恢复输出全部 AlphaSift 候选分析结果。定时任务会在 `STOCK_SELECTION_ENABLED=true` 时使用选股结果覆盖本次 `STOCK_LIST`；手动触发时请直接选择 `mode=stock-selection`，该模式会强制执行 AlphaSift 选股并只运行个股分析，不依赖固定 `STOCK_LIST` 入口。手动选择 `full` / `stocks-only` 时会使用固定 `STOCK_LIST`，不会因为仓库变量 `STOCK_SELECTION_ENABLED=true` 自动改跑选股；`mode=market-only` 会跳过自动选股。若自动选股失败或没有候选，workflow 会失败，不会静默回退到旧 `STOCK_LIST`，避免把固定自选股误认为推荐结果。
 
 ## 桌面端说明
 

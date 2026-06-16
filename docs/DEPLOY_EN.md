@@ -402,6 +402,7 @@ git push
    - `full` - Full analysis (stocks + market)
    - `market-only` - Market review only
    - `stocks-only` - Stock analysis only
+   - `stock-selection` - Stock selection recommendation (AlphaSift screening + stock analysis)
 5. Click green **"Run workflow"** button
 
 #### 5. View Execution Logs

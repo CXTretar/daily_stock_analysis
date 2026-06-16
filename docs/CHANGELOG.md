@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - [新功能] 个股分析历史成功保存后会从最终报告 best-effort 提取 `DecisionSignal` 决策信号，复用现有信号去重、计划质量计算和脱敏契约。
 - [新功能] GitHub Actions 每日分析新增可选自动选股推荐模式，支持先运行 AlphaSift 筛选候选股并覆盖本次 `STOCK_LIST` 后再执行原有个股分析与通知链路。
+- [改进] GitHub Actions 自动选股默认只保留主分析最终判定为 `decision_type=buy` 的股票进入报告和通知，避免候选股被误认为推荐买入。
+- [改进] GitHub Actions 手动运行模式新增 `stock-selection` 独立选股推荐入口，可不依赖固定 `STOCK_LIST` 直接触发 AlphaSift 选股加个股分析。
 
 ## [3.22.0] - 2026-06-13
 

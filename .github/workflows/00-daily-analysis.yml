@@ -17,6 +17,7 @@ on:
           - full          # 完整分析（股票+大盘）
           - market-only   # 仅大盘复盘
           - stocks-only   # 仅股票分析
+          - stock-selection # 选股推荐（AlphaSift 选股+股票分析）
       force_run:
         description: '强制运行（跳过交易日检查）'
         required: false
@@ -356,6 +357,8 @@ jobs:
           STOCK_SELECTION_MARKET: ${{ vars.STOCK_SELECTION_MARKET || secrets.STOCK_SELECTION_MARKET || 'cn' }}
           # 默认只分析 Top 3，避免云端数据源和 LLM 调用耗时过长
           STOCK_SELECTION_MAX_RESULTS: ${{ vars.STOCK_SELECTION_MAX_RESULTS || secrets.STOCK_SELECTION_MAX_RESULTS || '3' }}
+          # 自动选股默认只输出最终买入建议，避免把候选股误当成推荐买入
+          STOCK_SELECTION_REQUIRE_BUY: ${{ vars.STOCK_SELECTION_REQUIRE_BUY || secrets.STOCK_SELECTION_REQUIRE_BUY || 'true' }}
           STOCK_SELECTION_OUTPUT_JSON: ${{ vars.STOCK_SELECTION_OUTPUT_JSON || secrets.STOCK_SELECTION_OUTPUT_JSON || 'reports/alphasift-selection.json' }}
           MARKET_REVIEW_REGION: ${{ vars.MARKET_REVIEW_REGION || secrets.MARKET_REVIEW_REGION || 'cn' }}
           MARKET_REVIEW_COLOR_SCHEME: ${{ vars.MARKET_REVIEW_COLOR_SCHEME || secrets.MARKET_REVIEW_COLOR_SCHEME || 'green_up' }}
@@ -396,10 +399,28 @@ jobs:
 
           # 判断运行模式
           MODE="${{ github.event.inputs.mode || 'full' }}"
+          EVENT_NAME="${{ github.event_name }}"
+          STOCK_SOURCE_LABEL="配置的 STOCK_LIST"
 
-          case "${STOCK_SELECTION_ENABLED,,}" in
-            1|true|yes|on)
-              if [ "$MODE" = "market-only" ]; then
+          case "${MODE}:${STOCK_SELECTION_ENABLED,,}" in
+            stock-selection:*)
+              echo "🧭 已选择选股推荐模式: strategy=$STOCK_SELECTION_STRATEGY market=$STOCK_SELECTION_MARKET top=$STOCK_SELECTION_MAX_RESULTS"
+              SELECTED_STOCK_LIST="$(python scripts/run_alphasift_screen.py \
+                --strategy "$STOCK_SELECTION_STRATEGY" \
+                --market "$STOCK_SELECTION_MARKET" \
+                --max-results "$STOCK_SELECTION_MAX_RESULTS" \
+                --output-json "$STOCK_SELECTION_OUTPUT_JSON" \
+                --write-github-env)"
+              export STOCK_LIST="$SELECTED_STOCK_LIST"
+              export STOCK_SELECTION_ENABLED=true
+              STOCK_SOURCE_LABEL="AlphaSift 选股推荐"
+              echo "✅ 选股推荐结果: $STOCK_LIST"
+              ;;
+            *:1|*:true|*:yes|*:on)
+              if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+                echo "🧭 手动运行模式未选择 stock-selection，跳过自动选股并使用配置的 STOCK_LIST"
+                export STOCK_SELECTION_ENABLED=false
+              elif [ "$MODE" = "market-only" ]; then
                 echo "🧭 已开启选股推荐，但当前为 market-only 模式，跳过选股"
               else
                 echo "🧭 已开启选股推荐: strategy=$STOCK_SELECTION_STRATEGY market=$STOCK_SELECTION_MARKET top=$STOCK_SELECTION_MAX_RESULTS"
@@ -410,11 +431,21 @@ jobs:
                   --output-json "$STOCK_SELECTION_OUTPUT_JSON" \
                   --write-github-env)"
                 export STOCK_LIST="$SELECTED_STOCK_LIST"
+                STOCK_SOURCE_LABEL="AlphaSift 选股推荐"
                 echo "✅ 选股推荐结果: $STOCK_LIST"
               fi
               ;;
             *)
               echo "🧭 选股推荐: 未启用，使用配置的 STOCK_LIST"
+              ;;
+          esac
+
+          case "${STOCK_SELECTION_ENABLED,,}" in
+            1|true|yes|on)
+              echo "🧭 最终报告过滤: 只保留主分析判定为买入的股票（STOCK_SELECTION_REQUIRE_BUY=$STOCK_SELECTION_REQUIRE_BUY）"
+              ;;
+            *)
+              echo "🧭 最终报告过滤: 未启用选股买入过滤"
               ;;
           esac
           
@@ -423,7 +454,8 @@ jobs:
           echo "=========================================="
           echo "⏰ 时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
           echo "🎯 运行模式: $MODE"
-          echo "📊 自选股: $STOCK_LIST"
+          echo "📊 股票来源: $STOCK_SOURCE_LABEL"
+          echo "📊 股票列表: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
           echo ""
           echo "=========================================="
@@ -494,7 +526,7 @@ jobs:
           # 执行分析
           if [ "$MODE" = "market-only" ]; then
             python main.py --market-review $FORCE_RUN_ARG
-          elif [ "$MODE" = "stocks-only" ]; then
+          elif [ "$MODE" = "stocks-only" ] || [ "$MODE" = "stock-selection" ]; then
             python main.py --no-market-review $FORCE_RUN_ARG
           else
             python main.py $FORCE_RUN_ARG

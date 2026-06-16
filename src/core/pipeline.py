@@ -12,6 +12,7 @@ A股自选股智能分析系统 - 核心分析流水线
 """
 
 import logging
+import os
 import threading
 import time
 import uuid
@@ -85,6 +86,25 @@ from bot.models import BotMessage
 
 
 logger = logging.getLogger(__name__)
+
+# 自动选股买入过滤只接受稳定 public enum 的 buy，避免把“看多”趋势误当成可交易建议。
+_STOCK_SELECTION_BUY_DECISION_TYPES = {"buy"}
+
+
+def _is_truthy_env(value: str) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _stock_selection_buy_filter_enabled() -> bool:
+    if not _is_truthy_env(os.getenv("STOCK_SELECTION_ENABLED", "")):
+        return False
+    return _is_truthy_env(os.getenv("STOCK_SELECTION_REQUIRE_BUY", "true"))
+
+
+def _is_stock_selection_buy_recommendation(result: AnalysisResult) -> bool:
+    decision_type = str(getattr(result, "decision_type", "") or "").strip().lower()
+    return decision_type in _STOCK_SELECTION_BUY_DECISION_TYPES
+
 
 # 防御性 guard：当实例绕过 __init__（如测试中 __new__）构造时，
 # double-check 初始化 _single_stock_notify_lock 仍然线程安全。
@@ -2606,6 +2626,10 @@ class StockAnalysisPipeline:
             )
         
         results: List[AnalysisResult] = []
+        filtered_out_count = 0
+        stock_selection_buy_only = (not dry_run) and _stock_selection_buy_filter_enabled()
+        if stock_selection_buy_only:
+            logger.info("自动选股买入过滤已启用：最终报告只保留 decision_type=buy 的股票")
         
         # 使用线程池并发处理
         # 注意：max_workers 设置较低（默认3）以避免触发反爬
@@ -2630,6 +2654,15 @@ class StockAnalysisPipeline:
                 try:
                     result = future.result()
                     if result and result.success:
+                        if stock_selection_buy_only and not _is_stock_selection_buy_recommendation(result):
+                            filtered_out_count += 1
+                            logger.info(
+                                "[%s] 自动选股候选未达到买入建议，已从最终报告过滤: %s | decision_type=%s",
+                                code,
+                                getattr(result, "operation_advice", ""),
+                                getattr(result, "decision_type", ""),
+                            )
+                            continue
                         results.append(result)
                         if single_stock_notify and send_notification and not dry_run:
                             self._send_single_stock_notification(
@@ -2673,11 +2706,24 @@ class StockAnalysisPipeline:
             )
             fail_count = len(stock_codes) - success_count
         else:
+            analyzed_success_count = len(results) + filtered_out_count
             success_count = len(results)
-            fail_count = len(stock_codes) - success_count
+            fail_count = len(stock_codes) - analyzed_success_count
         
         logger.info("===== 分析完成 =====")
-        logger.info(f"成功: {success_count}, 失败: {fail_count}, 耗时: {elapsed_time:.2f} 秒")
+        if not dry_run and stock_selection_buy_only:
+            logger.info(
+                "分析成功: %s, 买入推荐: %s, 已过滤非买入候选: %s, 失败: %s, 耗时: %.2f 秒",
+                success_count + filtered_out_count,
+                success_count,
+                filtered_out_count,
+                fail_count,
+                elapsed_time,
+            )
+            if not results:
+                logger.warning("自动选股买入过滤后没有符合买入条件的股票，本次不生成个股报告")
+        else:
+            logger.info(f"成功: {success_count}, 失败: {fail_count}, 耗时: {elapsed_time:.2f} 秒")
         
         # 保存报告到本地文件（无论是否推送通知都保存）
         if results and not dry_run:

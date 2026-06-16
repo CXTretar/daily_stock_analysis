@@ -152,10 +152,11 @@ daily_stock_analysis/
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
 | `STOCK_LIST` | 自选股代码，如 `600519,300750,002594` | ✅ |
-| `STOCK_SELECTION_ENABLED` | GitHub Actions 自动选股分析开关：设为 `true` 时先运行 AlphaSift 选股，再用候选股覆盖本次 `STOCK_LIST`；该脚本会在本次运行内开启 AlphaSift | 可选 |
+| `STOCK_SELECTION_ENABLED` | GitHub Actions 定时自动选股开关：设为 `true` 时，定时任务会先运行 AlphaSift 选股，再用候选股覆盖本次运行内 `STOCK_LIST`；手动触发请直接选择 `mode=stock-selection` | 可选 |
 | `STOCK_SELECTION_STRATEGY` | 自动选股策略 ID，默认 `dual_low`；可通过 Web 选股页或 `/api/v1/alphasift/strategies` 查看 | 可选 |
 | `STOCK_SELECTION_MARKET` | 自动选股市场，默认 `cn`；当前 Web 选股页仅暴露 A 股市场 | 可选 |
 | `STOCK_SELECTION_MAX_RESULTS` | 自动选股后进入分析的候选数量，默认 `3`，避免云端数据源和 LLM 调用耗时过长 | 可选 |
+| `STOCK_SELECTION_REQUIRE_BUY` | 自动选股最终报告过滤开关，默认 `true`；开启时只保留主分析最终判定为 `decision_type=buy` 的股票 | 可选 |
 | `STOCK_SELECTION_OUTPUT_JSON` | 自动选股结果 JSON 保存路径，默认 `reports/alphasift-selection.json`，用于排查候选来源 | 可选 |
 | `ALPHASIFT_ENABLED` | AlphaSift Web/API 选股服务开关；Web 选股页需要开启，Actions 自动选股可只配置 `STOCK_SELECTION_ENABLED` | 可选 |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
@@ -688,9 +689,11 @@ schedule:
 手动触发步骤：
 
 1. 打开 `Actions → 每日股票分析 → Run workflow`
-2. 选择 `mode`（`full` / `market-only` / `stocks-only`）
+2. 选择 `mode`（`full` / `market-only` / `stocks-only` / `stock-selection`）
 3. 若当天是非交易日且希望仍执行，将 `force_run` 设为 `true`
 4. 点击 `Run workflow`
+
+`stock-selection` 是独立选股推荐入口：本次运行会强制执行 AlphaSift 选股，用选股结果覆盖运行内 `STOCK_LIST`，然后只跑个股分析，不跑大盘复盘。固定自选股分析仍使用 `stocks-only`；手动选择 `full` / `stocks-only` 时不会因为仓库变量 `STOCK_SELECTION_ENABLED=true` 而自动改跑选股。
 
 ### 本地定时任务
 
