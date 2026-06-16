@@ -1794,6 +1794,8 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
                 lookback_days=20,
                 source="akshare",
                 retries=1,
+                cache_dir="/tmp/alphasift-daily-cache",
+                cache_ttl_seconds=3600,
             )
             captured["daily_df"] = daily_df
             captured["context"] = kwargs.get("context")
@@ -1833,6 +1835,65 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertIs(captured["context"]["dsa"]["get_daily_history"], dsa_history_mock)
         dsa_history_mock.assert_called_once_with("600519", lookback_days=20)
         original_daily_fetch.assert_not_called()
+        self.assertIs(daily_module.fetch_daily_history, original_daily_fetch)
+
+    def test_screen_forwards_daily_cache_kwargs_when_dsa_history_fails(self) -> None:
+        config = self._config(enabled=True)
+        parent_module = ModuleType("alphasift")
+        daily_module = ModuleType("alphasift.daily")
+        original_daily_fetch = MagicMock(
+            return_value=[
+                {
+                    "date": "2026-06-03",
+                    "open": 10.1,
+                    "high": 10.8,
+                    "low": 10.0,
+                    "close": 10.5,
+                    "volume": 123400,
+                }
+            ]
+        )
+        daily_module.fetch_daily_history = original_daily_fetch
+        parent_module.daily = daily_module
+        captured: Dict[str, Any] = {}
+
+        def screen_with_daily_fetch(strategy: str, **kwargs: Any) -> Dict[str, Any]:
+            daily_df = daily_module.fetch_daily_history(
+                "600519",
+                lookback_days=20,
+                source="akshare",
+                retries=1,
+                cache_dir="/tmp/alphasift-daily-cache",
+                cache_ttl_seconds=3600,
+            )
+            captured["daily_df"] = daily_df
+            return {
+                "strategy": strategy,
+                "candidates": [{"code": "600519", "score": 88.0}],
+            }
+
+        fake_module = _make_adapter_module(screen=MagicMock(side_effect=screen_with_daily_fetch))
+
+        with (
+            patch.dict(sys.modules, {"alphasift": parent_module, "alphasift.daily": daily_module}),
+            patch("src.services.alphasift_service._import_alphasift", return_value=fake_module),
+            patch(
+                "src.services.alphasift_service.get_dsa_daily_history",
+                side_effect=RuntimeError("dsa history unavailable"),
+            ),
+        ):
+            payload = self._screen(config, market="cn", strategy="dual_low", max_results=5)
+
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertIs(captured["daily_df"], original_daily_fetch.return_value)
+        original_daily_fetch.assert_called_once_with(
+            "600519",
+            lookback_days=20,
+            source="akshare",
+            retries=1,
+            cache_dir="/tmp/alphasift-daily-cache",
+            cache_ttl_seconds=3600,
+        )
         self.assertIs(daily_module.fetch_daily_history, original_daily_fetch)
 
     def test_screen_enriches_top_candidates_with_dsa_context(self) -> None:
