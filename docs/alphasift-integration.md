@@ -193,6 +193,21 @@ AlphaSift 侧已在 `ZhuLinsen/alphasift@14e74fc0819267f7c04c3117a0dd0fe3f9b1940
 - 结果页展示运行 ID、样本数量、过滤后数量、LLM 是否重排、LLM 覆盖率和 DSA 增强计数；如果 AlphaSift 返回 warning/source error/LLM parse error 或 `llm_ranked=false`，页面会明确显示降级原因，避免把本地因子结果误展示成正常 LLM 判断；重复的快照源 fallback warning/source error 会在前端合并展示为一条“数据源降级”提示。
 - 展开候选时展示 AlphaSift 摘要、因子和 LLM 判断；若 DSA 已增强，还会展示 `DSA 增强摘要`、`DSA 新闻` 和 `DSA 增强提示`。
 
+## GitHub Actions 自动选股分析
+
+仓库自带 `00-daily-analysis.yml` 支持可选的自动选股推荐模式。设置 `STOCK_SELECTION_ENABLED=true` 后，workflow 会在执行普通个股分析前调用 `scripts/run_alphasift_screen.py`，将 AlphaSift 返回的 Top 候选导出为本次运行的 `STOCK_LIST`，再复用原有报告与通知链路。
+
+推荐在 `Settings -> Secrets and variables -> Actions -> Variables` 配置：
+
+```env
+STOCK_SELECTION_ENABLED=true
+STOCK_SELECTION_STRATEGY=dual_low
+STOCK_SELECTION_MARKET=cn
+STOCK_SELECTION_MAX_RESULTS=3
+```
+
+`scripts/run_alphasift_screen.py` 会在本次进程内开启 AlphaSift，因此 Actions 自动选股只需设置 `STOCK_SELECTION_ENABLED=true`；`ALPHASIFT_ENABLED=true` 仍用于 Web/API 选股入口。`STOCK_SELECTION_MAX_RESULTS` 默认 3，用于限制进入完整分析链路的候选数量，避免 GitHub Actions 中全市场快照、新闻补全和 LLM 重排耗时过长。`mode=market-only` 时 workflow 会跳过自动选股；`stocks-only` 和 `full` 会使用选股结果覆盖本次 `STOCK_LIST`。若自动选股失败或没有候选，workflow 会失败，不会静默回退到旧 `STOCK_LIST`，避免把固定自选股误认为推荐结果。
+
 ## 桌面端说明
 
 源码运行的桌面端复用同一个 Python 后端环境，并设置 `DSA_DESKTOP_MODE=true`；通过设置页开启时如缺少适配层，会提示更新依赖或重建后端产物。

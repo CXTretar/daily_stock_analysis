@@ -152,6 +152,12 @@ daily_stock_analysis/
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
 | `STOCK_LIST` | 自选股代码，如 `600519,300750,002594` | ✅ |
+| `STOCK_SELECTION_ENABLED` | GitHub Actions 自动选股分析开关：设为 `true` 时先运行 AlphaSift 选股，再用候选股覆盖本次 `STOCK_LIST`；该脚本会在本次运行内开启 AlphaSift | 可选 |
+| `STOCK_SELECTION_STRATEGY` | 自动选股策略 ID，默认 `dual_low`；可通过 Web 选股页或 `/api/v1/alphasift/strategies` 查看 | 可选 |
+| `STOCK_SELECTION_MARKET` | 自动选股市场，默认 `cn`；当前 Web 选股页仅暴露 A 股市场 | 可选 |
+| `STOCK_SELECTION_MAX_RESULTS` | 自动选股后进入分析的候选数量，默认 `3`，避免云端数据源和 LLM 调用耗时过长 | 可选 |
+| `STOCK_SELECTION_OUTPUT_JSON` | 自动选股结果 JSON 保存路径，默认 `reports/alphasift-selection.json`，用于排查候选来源 | 可选 |
+| `ALPHASIFT_ENABLED` | AlphaSift Web/API 选股服务开关；Web 选股页需要开启，Actions 自动选股可只配置 `STOCK_SELECTION_ENABLED` | 可选 |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 可选 |
@@ -1404,6 +1410,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 - 🧭 **首次配置提示** - 首页会读取只读配置状态，缺少 LLM 主渠道、自选股等基础项时提示缺口并引导进入系统设置
 - 📊 **实时进度** - 分析任务状态实时更新，支持多任务并行；普通分析链路在进入 LLM 阶段后会优先尝试 LiteLLM 流式生成，并通过任务 SSE 回灌更细粒度的 `message/progress`
 - 🧪 **AlphaSift 选股任务可恢复** - 选股页提交后台任务后轮询状态，切换页面再返回会恢复当前任务进度或最终结果，避免外部快照/行情/LLM 变慢时丢失反馈
+- 🧭 **自动选股分析** - GitHub Actions 可配置 `STOCK_SELECTION_ENABLED=true`，先运行 AlphaSift 选股并把 Top 候选覆盖为本次 `STOCK_LIST`，再复用原有个股分析和通知链路
 - 🗂️ **大盘复盘任务可见性** - 首页触发大盘复盘后会返回 `task_id` 并轮询 `GET /api/v1/analysis/status/{task_id}`，在进行中/完成/失败场景给出可见反馈，失败时直接透出报错内容
 - 🗂️ **市场复盘历史独立入口** - 大盘复盘历史通过专用入口与普通个股历史隔离；建议通过 `stock_code=MARKET` + `report_type=market_review` 直接查询与回放大盘复盘记录
 - 🧾 **市场复盘历史可复用** - 大盘复盘任务会持久化到分析历史，`report_type` 为 `market_review`，可直接通过历史列表/详情打开对应 Markdown 或详情页，不会重新触发分析重算

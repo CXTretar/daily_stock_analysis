@@ -348,6 +348,15 @@ jobs:
           # 自选股配置
           # ==========================================
           STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || '600519' }}
+          # 选股推荐默认关闭；开启后先筛出候选股，再覆盖本次 STOCK_LIST 做分析
+          STOCK_SELECTION_ENABLED: ${{ vars.STOCK_SELECTION_ENABLED || secrets.STOCK_SELECTION_ENABLED || 'false' }}
+          ALPHASIFT_ENABLED: ${{ vars.ALPHASIFT_ENABLED || secrets.ALPHASIFT_ENABLED || 'false' }}
+          ALPHASIFT_INSTALL_SPEC: ${{ vars.ALPHASIFT_INSTALL_SPEC || secrets.ALPHASIFT_INSTALL_SPEC }}
+          STOCK_SELECTION_STRATEGY: ${{ vars.STOCK_SELECTION_STRATEGY || secrets.STOCK_SELECTION_STRATEGY || 'dual_low' }}
+          STOCK_SELECTION_MARKET: ${{ vars.STOCK_SELECTION_MARKET || secrets.STOCK_SELECTION_MARKET || 'cn' }}
+          # 默认只分析 Top 3，避免云端数据源和 LLM 调用耗时过长
+          STOCK_SELECTION_MAX_RESULTS: ${{ vars.STOCK_SELECTION_MAX_RESULTS || secrets.STOCK_SELECTION_MAX_RESULTS || '3' }}
+          STOCK_SELECTION_OUTPUT_JSON: ${{ vars.STOCK_SELECTION_OUTPUT_JSON || secrets.STOCK_SELECTION_OUTPUT_JSON || 'reports/alphasift-selection.json' }}
           MARKET_REVIEW_REGION: ${{ vars.MARKET_REVIEW_REGION || secrets.MARKET_REVIEW_REGION || 'cn' }}
           MARKET_REVIEW_COLOR_SCHEME: ${{ vars.MARKET_REVIEW_COLOR_SCHEME || secrets.MARKET_REVIEW_COLOR_SCHEME || 'green_up' }}
           
@@ -387,6 +396,27 @@ jobs:
 
           # 判断运行模式
           MODE="${{ github.event.inputs.mode || 'full' }}"
+
+          case "${STOCK_SELECTION_ENABLED,,}" in
+            1|true|yes|on)
+              if [ "$MODE" = "market-only" ]; then
+                echo "🧭 已开启选股推荐，但当前为 market-only 模式，跳过选股"
+              else
+                echo "🧭 已开启选股推荐: strategy=$STOCK_SELECTION_STRATEGY market=$STOCK_SELECTION_MARKET top=$STOCK_SELECTION_MAX_RESULTS"
+                SELECTED_STOCK_LIST="$(python scripts/run_alphasift_screen.py \
+                  --strategy "$STOCK_SELECTION_STRATEGY" \
+                  --market "$STOCK_SELECTION_MARKET" \
+                  --max-results "$STOCK_SELECTION_MAX_RESULTS" \
+                  --output-json "$STOCK_SELECTION_OUTPUT_JSON" \
+                  --write-github-env)"
+                export STOCK_LIST="$SELECTED_STOCK_LIST"
+                echo "✅ 选股推荐结果: $STOCK_LIST"
+              fi
+              ;;
+            *)
+              echo "🧭 选股推荐: 未启用，使用配置的 STOCK_LIST"
+              ;;
+          esac
           
           echo "=========================================="
           echo "🚀 A股自选股智能分析系统"
