@@ -60,6 +60,28 @@ def _selected_codes(candidates: Iterable[Dict[str, Any]]) -> List[str]:
     return codes
 
 
+def _write_output_json(output_json: str, result: Dict[str, Any]) -> None:
+    output_path = Path(output_json)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _log_empty_screen_result(result: Dict[str, Any]) -> None:
+    diagnostics = {
+        "strategy": result.get("strategy"),
+        "market": result.get("market"),
+        "snapshot_source": result.get("snapshot_source"),
+        "snapshot_count": result.get("snapshot_count"),
+        "after_filter_count": result.get("after_filter_count"),
+        "candidate_count": result.get("candidate_count"),
+        "warnings": result.get("warnings") or result.get("degradation") or [],
+        "source_errors": result.get("source_errors") or [],
+        "daily_enriched": result.get("daily_enriched"),
+        "daily_enrich_count": result.get("daily_enrich_count"),
+    }
+    logging.error("AlphaSift screening returned no usable stock codes. diagnostics=%s", diagnostics)
+
+
 def _write_github_env(name: str, value: str) -> None:
     github_env = os.getenv("GITHUB_ENV")
     if not github_env:
@@ -124,18 +146,16 @@ def main() -> int:
     )
     candidates = result.get("candidates") if isinstance(result, dict) else []
     codes = _selected_codes(candidates if isinstance(candidates, list) else [])
+    output_json = args.output_json.strip()
+    if output_json:
+        _write_output_json(output_json, result)
+
     if not codes:
-        logging.error("AlphaSift screening returned no usable stock codes.")
+        _log_empty_screen_result(result if isinstance(result, dict) else {"candidates": candidates})
         return 2
 
     stock_list = ",".join(codes)
     print(stock_list)
-
-    output_json = args.output_json.strip()
-    if output_json:
-        output_path = Path(output_json)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.write_github_env:
         _write_github_env("STOCK_LIST", stock_list)

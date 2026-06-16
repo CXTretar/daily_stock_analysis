@@ -1070,6 +1070,13 @@ class AlphaSiftService:
         candidates = _normalize_candidates(raw_data)
         selected = candidates[:max_results]
         selected, dsa_enrichment = _enrich_candidates_with_dsa(selected)
+        warning_items: List[Any] = []
+        for key in ("warnings", "degradation"):
+            value = raw_data.get(key)
+            if isinstance(value, list):
+                warning_items.extend(value)
+            elif value:
+                warning_items.append(value)
         return {
             "enabled": True,
             "candidates": selected,
@@ -1086,7 +1093,7 @@ class AlphaSiftService:
             "llm_portfolio_risk": raw_data.get("llm_portfolio_risk") or "",
             "llm_coverage": raw_data.get("llm_coverage"),
             "llm_parse_errors": raw_data.get("llm_parse_errors") or [],
-            "warnings": raw_data.get("warnings") or [],
+            "warnings": _dedupe_strings(warning_items),
             "source_errors": raw_data.get("source_errors") or [],
             "dsa_enrichment": dsa_enrichment,
             "deep_analysis_requested": raw_data.get("deep_analysis_requested"),

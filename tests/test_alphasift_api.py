@@ -1722,6 +1722,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
                     "llm_ranked": True,
                     "llm_coverage": 1.0,
                     "warnings": ["fallback"],
+                    "degradation": ["fallback", "No candidates after daily hard filter"],
                     "source_errors": [],
                     "deep_analysis_requested": False,
                     "post_analyzers": ["scorecard"],
@@ -1765,7 +1766,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(payload["after_filter_count"], 5)
         self.assertEqual(payload["llm_ranked"], True)
         self.assertEqual(payload["llm_coverage"], 1.0)
-        self.assertEqual(payload["warnings"], ["fallback"])
+        self.assertEqual(payload["warnings"], ["fallback", "No candidates after daily hard filter"])
         self.assertEqual(payload["candidate_count"], 1)
         self.assertEqual(payload["post_analyzers"], ["scorecard"])
         self.assertEqual(payload["daily_enriched"], True)
