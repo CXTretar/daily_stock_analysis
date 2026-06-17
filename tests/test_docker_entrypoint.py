@@ -29,7 +29,7 @@ def test_dockerfile_bundles_default_alphasift_adapter() -> None:
     requirements = (REPO_ROOT / "requirements.txt").read_text(encoding="utf-8")
 
     assert "git \\" in dockerfile
-    assert "git+https://github.com/CXTretar/alphasift.git@ea1360787dcbeffc081887730fbb57f74f83dd85#egg=alphasift" in requirements
+    assert "git+https://github.com/CXTretar/alphasift.git@5d8ba5acd8ffc0c12ba8ffcac937f7af3984fa97#egg=alphasift" in requirements
     assert "pip install --no-cache-dir -r requirements.txt" in dockerfile
     assert "import alphasift.dsa_adapter" in dockerfile
 
