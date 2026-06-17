@@ -36,6 +36,20 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _parse_strategy_list(raw: str) -> List[str]:
+    value = (raw or "").strip()
+    if value.lower() in {"", "0", "false", "none", "off"}:
+        return []
+    strategies: List[str] = []
+    seen = set()
+    for item in value.split(","):
+        strategy = item.strip()
+        if strategy and strategy not in seen:
+            strategies.append(strategy)
+            seen.add(strategy)
+    return strategies
+
+
 def _candidate_code(candidate: Dict[str, Any]) -> str:
     return str(
         candidate.get("code")
@@ -67,7 +81,14 @@ def _write_output_json(output_json: str, result: Dict[str, Any]) -> None:
 
 
 def _log_empty_screen_result(result: Dict[str, Any]) -> None:
-    diagnostics = {
+    logging.error(
+        "AlphaSift screening returned no usable stock codes. diagnostics=%s",
+        _screen_diagnostics(result),
+    )
+
+
+def _screen_diagnostics(result: Dict[str, Any]) -> Dict[str, Any]:
+    return {
         "strategy": result.get("strategy"),
         "market": result.get("market"),
         "snapshot_source": result.get("snapshot_source"),
@@ -79,7 +100,33 @@ def _log_empty_screen_result(result: Dict[str, Any]) -> None:
         "daily_enriched": result.get("daily_enriched"),
         "daily_enrich_count": result.get("daily_enrich_count"),
     }
-    logging.error("AlphaSift screening returned no usable stock codes. diagnostics=%s", diagnostics)
+
+
+def _with_fallback_metadata(
+    result: Dict[str, Any],
+    *,
+    primary_result: Dict[str, Any],
+    primary_strategy: str,
+    fallback_strategy: str,
+    attempted_strategies: List[str],
+) -> Dict[str, Any]:
+    merged = dict(result)
+    fallback_warning = (
+        f"Primary strategy {primary_strategy} returned no usable stock codes; "
+        f"fallback strategy {fallback_strategy} selected."
+    )
+    warnings = list(merged.get("warnings") or merged.get("degradation") or [])
+    if fallback_warning not in warnings:
+        warnings.append(fallback_warning)
+    merged["warnings"] = warnings
+    merged["selection_fallback"] = {
+        "trigger": "empty_primary_result",
+        "primary_strategy": primary_strategy,
+        "fallback_strategy": fallback_strategy,
+        "attempted_strategies": attempted_strategies,
+        "primary_diagnostics": _screen_diagnostics(primary_result),
+    }
+    return merged
 
 
 def _write_github_env(name: str, value: str) -> None:
@@ -114,6 +161,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional path to save the full screening result.",
     )
     parser.add_argument(
+        "--fallback-strategies",
+        default=os.getenv("STOCK_SELECTION_FALLBACK_STRATEGIES", "dual_low"),
+        help=(
+            "Comma-separated AlphaSift strategies to try when the primary strategy "
+            "returns no usable stock codes. Use empty/false/none/off to fail fast."
+        ),
+    )
+    parser.add_argument(
         "--write-github-env",
         action="store_true",
         default=_parse_bool(os.getenv("STOCK_SELECTION_WRITE_GITHUB_ENV", "false")),
@@ -146,6 +201,43 @@ def main() -> int:
     )
     candidates = result.get("candidates") if isinstance(result, dict) else []
     codes = _selected_codes(candidates if isinstance(candidates, list) else [])
+    attempted_strategies = [args.strategy]
+
+    if not codes and isinstance(result, dict):
+        fallback_strategies = [
+            strategy
+            for strategy in _parse_strategy_list(args.fallback_strategies)
+            if strategy != args.strategy
+        ]
+        for fallback_strategy in fallback_strategies:
+            attempted_strategies.append(fallback_strategy)
+            logging.warning(
+                "AlphaSift strategy %s returned no usable stock codes; trying fallback strategy %s.",
+                args.strategy,
+                fallback_strategy,
+            )
+            fallback_result = AlphaSiftService(config=config).screen(
+                strategy=fallback_strategy,
+                market=args.market,
+                max_results=args.max_results,
+            )
+            fallback_candidates = (
+                fallback_result.get("candidates") if isinstance(fallback_result, dict) else []
+            )
+            fallback_codes = _selected_codes(
+                fallback_candidates if isinstance(fallback_candidates, list) else []
+            )
+            if fallback_codes and isinstance(fallback_result, dict):
+                result = _with_fallback_metadata(
+                    fallback_result,
+                    primary_result=result,
+                    primary_strategy=args.strategy,
+                    fallback_strategy=fallback_strategy,
+                    attempted_strategies=attempted_strategies,
+                )
+                codes = fallback_codes
+                break
+
     output_json = args.output_json.strip()
     if output_json:
         _write_output_json(output_json, result)

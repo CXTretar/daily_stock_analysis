@@ -158,6 +158,7 @@ daily_stock_analysis/
 | `STOCK_SELECTION_MAX_RESULTS` | 自动选股后进入分析的候选数量，默认 `3`，避免云端数据源和 LLM 调用耗时过长 | 可选 |
 | `STOCK_SELECTION_REQUIRE_BUY` | 自动选股最终报告过滤开关，默认 `true`；开启时只保留主分析最终判定为 `decision_type=buy` 的股票 | 可选 |
 | `STOCK_SELECTION_OUTPUT_JSON` | 自动选股结果 JSON 保存路径，默认 `reports/alphasift-selection.json`，用于排查候选来源 | 可选 |
+| `STOCK_SELECTION_FALLBACK_STRATEGIES` | 主策略当天无可用候选时尝试的 AlphaSift 备用策略列表，默认 `dual_low`；设为空、`false`、`none` 或 `off` 可保持 fail-fast | 可选 |
 | `ALPHASIFT_ENABLED` | AlphaSift Web/API 选股服务开关；Web 选股页需要开启，Actions 自动选股可只配置 `STOCK_SELECTION_ENABLED` | 可选 |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) 针对中文内容特别优化；同一 Key 可用于搜索与 Anspire 大模型网关的兜底示例（是否可用以控制台与账号权限为准） | 推荐 |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 搜索引擎结果补强，适合实时金融新闻 | 推荐 |

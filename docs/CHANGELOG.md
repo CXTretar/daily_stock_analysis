@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 发布说明生成查询 PR 作者失败时保留降级并输出包含 PR 编号和异常类型的 warning，便于排查 token、权限、网络或 GitHub API 异常。
 - [改进] DSA 数据源链路新增 Tencent 日 K 直连 fetcher、daily source health 短期熔断，并升级 AlphaSift 默认 pin/runtime bridge，默认启用 `DAILY_SOURCE=auto`、Sina snapshot 优先级和候选级 quote context。
 - [文档] 补充 AlphaSift 迁移与回退边界：明确 `ALPHASIFT_INSTALL_SPEC` 显式覆盖语义、`requirements.txt + DEFAULT_ALPHASIFT_INSTALL_SPEC` 与运行时兼容边界、以及回滚路径（关闭功能/完整 revert）说明，覆盖旧 pin 用户升级行为。
+- [改进] GitHub Actions 自动选股在主策略无可用候选时支持按 `STOCK_SELECTION_FALLBACK_STRATEGIES` 尝试 AlphaSift 备用策略，并在结果 JSON 记录主策略诊断。
 
 - [新功能] 个股分析历史成功保存后会从最终报告 best-effort 提取 `DecisionSignal` 决策信号，复用现有信号去重、计划质量计算和脱敏契约。
 - [新功能] GitHub Actions 每日分析新增可选自动选股推荐模式，支持先运行 AlphaSift 筛选候选股并覆盖本次 `STOCK_LIST` 后再执行原有个股分析与通知链路。

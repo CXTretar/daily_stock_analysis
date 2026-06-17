@@ -149,6 +149,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `STOCK_SELECTION_MARKET` | Stock-selection market, default `cn`; the current Web screening page exposes CN A-shares | Optional |
 | `STOCK_SELECTION_MAX_RESULTS` | Number of selected candidates entering full stock analysis, default `3`, to limit data-source and LLM runtime cost | Optional |
 | `STOCK_SELECTION_REQUIRE_BUY` | Final report filter for stock-selection runs, default `true`; only stocks whose final main analysis has `decision_type=buy` are kept | Optional |
+| `STOCK_SELECTION_FALLBACK_STRATEGIES` | Comma-separated AlphaSift fallback strategies to try when the primary strategy returns no usable candidates, default `dual_low`; set empty, `false`, `none`, or `off` to keep fail-fast behavior | Optional |
 | `ANSPIRE_API_KEYS` | [Anspire AI Search](https://aisearch.anspire.cn/) optimized for Chinese content; the same key can also be used for Anspire LLM fallback scenarios (example model: `Doubao-Seed-2.0-lite`) | Recommended |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) search-engine results for realtime financial news | Recommended |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Optional |
