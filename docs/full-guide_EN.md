@@ -190,7 +190,7 @@ To get started quickly, you need at minimum:
 
 ### 5. Done!
 
-Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
+Default schedule: daily at **08:30 (Beijing Time)**.
 
 ---
 
@@ -589,7 +589,7 @@ Edit `.github/workflows/00-daily-analysis.yml`:
 ```yaml
 schedule:
   # UTC time, Beijing time = UTC + 8
-  - cron: '0 10 * * 1-5'   # Monday to Friday 18:00 (Beijing Time)
+  - cron: '30 0 * * *'     # Daily 08:30 (Beijing Time)
 ```
 
 Common time reference:
@@ -599,7 +599,7 @@ Common time reference:
 | 09:30 | `'30 1 * * 1-5'` |
 | 12:00 | `'0 4 * * 1-5'` |
 | 15:00 | `'0 7 * * 1-5'` |
-| 18:00 | `'0 10 * * 1-5'` |
+| 08:30 | `'30 0 * * *'` |
 | 21:00 | `'0 13 * * 1-5'` |
 
 ### Local Scheduled Tasks
