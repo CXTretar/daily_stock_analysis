@@ -145,6 +145,16 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("决策简报", out)
         self.assertIn("贵州茅台", out)
 
+    def test_render_brief_uses_yellow_icon_for_watch_advice(self) -> None:
+        """Brief report maps watch recommendations to the yellow bucket icon."""
+        r = _make_result(sentiment_score=52, operation_advice="观望")
+
+        out = render("brief", [r])
+
+        self.assertIsNotNone(out)
+        self.assertIn("**贵州茅台(600519)** 🟡 观望", out)
+        self.assertNotIn("**贵州茅台(600519)** ⚪ 观望", out)
+
     def test_render_brief_respects_model_visibility_toggle(self) -> None:
         r = _make_result(model_used="gemini/gemini-2.5-flash")
 

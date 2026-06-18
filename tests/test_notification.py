@@ -667,6 +667,25 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertNotIn("基本面分析", out)
 
     @mock.patch("src.notification.get_config")
+    def test_simple_recommendation_report_uses_yellow_icon_for_watch_advice(self, mock_get_config: mock.MagicMock):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=52,
+            trend_prediction="看多",
+            operation_advice="观望",
+            analysis_summary="等待回调。",
+            decision_type="hold",
+        )
+
+        out = service.generate_simple_recommendation_report([result], report_date="2026-02-01")
+
+        self.assertIn("### 🟡 贵州茅台 (600519) | 建议：观望", out)
+        self.assertNotIn("### ⚪ 贵州茅台 (600519) | 建议：观望", out)
+
+    @mock.patch("src.notification.get_config")
     def test_generate_brief_report_shows_model_by_default(self, mock_get_config: mock.MagicMock):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
         service = NotificationService()

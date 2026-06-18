@@ -771,7 +771,7 @@ def get_signal_level(advice: Any, score: Any, language: Optional[str]) -> tuple[
     if canonical == "hold":
         return (_OPERATION_ADVICE_TRANSLATIONS["hold"][normalized_language], "🟡", "hold")
     if canonical == "watch":
-        return (_OPERATION_ADVICE_TRANSLATIONS["watch"][normalized_language], "⚪", "watch")
+        return (_OPERATION_ADVICE_TRANSLATIONS["watch"][normalized_language], "🟡", "watch")
     if canonical == "reduce":
         return (_OPERATION_ADVICE_TRANSLATIONS["reduce"][normalized_language], "🟠", "reduce")
     if canonical in {"sell", "strong_sell"}:
@@ -789,7 +789,7 @@ def get_signal_level(advice: Any, score: Any, language: Optional[str]) -> tuple[
     if numeric_score >= 55:
         return (_OPERATION_ADVICE_TRANSLATIONS["hold"][normalized_language], "🟡", "hold")
     if numeric_score >= 45:
-        return (_OPERATION_ADVICE_TRANSLATIONS["watch"][normalized_language], "⚪", "watch")
+        return (_OPERATION_ADVICE_TRANSLATIONS["watch"][normalized_language], "🟡", "watch")
     if numeric_score >= 35:
         return (_OPERATION_ADVICE_TRANSLATIONS["reduce"][normalized_language], "🟠", "reduce")
     return (_OPERATION_ADVICE_TRANSLATIONS["sell"][normalized_language], "🔴", "sell")
