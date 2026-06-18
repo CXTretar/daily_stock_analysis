@@ -2681,7 +2681,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertTrue(response["success"])
         self.assertTrue(
-            any("SCHEDULE_TIME=18:00 已写入 .env" in warning for warning in response["warnings"]),
+            any("SCHEDULE_TIME=08:30 已写入 .env" in warning for warning in response["warnings"]),
             response["warnings"],
         )
 

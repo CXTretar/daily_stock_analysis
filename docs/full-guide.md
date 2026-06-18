@@ -432,7 +432,7 @@ daily_stock_analysis/
 | `MARKET_REVIEW_COLOR_SCHEME` | 大盘复盘指数涨跌颜色：`green_up`=绿涨红跌（默认），`red_up`=红涨绿跌 | `green_up` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：默认 `true`，非交易日跳过执行；设为 `false` 或使用 `--force-run` 可强制执行（Issue #373） | `true` |
 | `SCHEDULE_ENABLED` | 启用定时任务 | `false` |
-| `SCHEDULE_TIME` | 定时执行时间 | `18:00` |
+| `SCHEDULE_TIME` | 定时执行时间 | `08:30` |
 | `LOG_DIR` | 日志目录 | `./logs` |
 | `SAVE_CONTEXT_SNAPSHOT` | 保存分析历史 `context_snapshot`；设为 `false` 时新历史不保存 enhanced_context、market_phase_summary、AnalysisContextPack overview 或诊断快照，但不关闭当次 Prompt 低敏摘要 | `true` |
 
@@ -698,12 +698,12 @@ schedule:
 
 ### 本地定时任务
 
-内建的定时任务调度器支持每天在指定时间（默认 18:00）运行分析。
+内建的定时任务调度器支持每天在指定时间（默认 08:30）运行分析。
 
 #### 命令行方式
 
 ```bash
-# 启动定时模式（启动时立即执行一次，随后每天 18:00 执行）
+# 启动定时模式（启动时立即执行一次，随后每天 08:30 执行）
 python main.py --schedule
 
 # 启动定时模式（启动时不执行，仅等待下次定时触发）
@@ -721,7 +721,7 @@ python main.py --schedule --no-run-immediately
 | 变量名 | 说明 | 默认值 | 示例 |
 |--------|------|:-------:|:-----:|
 | `SCHEDULE_ENABLED` | 是否启用定时任务 | `false` | `true` |
-| `SCHEDULE_TIME` | 每日执行时间 (HH:MM) | `18:00` | `09:30` |
+| `SCHEDULE_TIME` | 每日执行时间 (HH:MM) | `08:30` | `09:30` |
 | `SCHEDULE_RUN_IMMEDIATELY` | 定时模式启动时是否立即运行一次；未显式设置时沿用 `RUN_IMMEDIATELY` 的运行时覆盖语义 | `true` | `false` |
 | `RUN_IMMEDIATELY` | 非定时模式启动时是否立即运行一次；同时作为未显式设置 `SCHEDULE_RUN_IMMEDIATELY` 时的 legacy 回退 | `true` | `false` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：非交易日跳过执行；设为 `false` 可强制执行 | `true` | `false` |

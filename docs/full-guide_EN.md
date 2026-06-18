@@ -357,7 +357,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), both (all three markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
 | `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
-| `SCHEDULE_TIME` | Scheduled execution time | `18:00` |
+| `SCHEDULE_TIME` | Scheduled execution time | `08:30` |
 | `SCHEDULE_RUN_IMMEDIATELY` | Run once immediately when scheduler mode starts; when unset it keeps following the legacy `RUN_IMMEDIATELY` runtime override | `true` |
 | `RUN_IMMEDIATELY` | Run once immediately for non-scheduler startup; also acts as the legacy fallback when `SCHEDULE_RUN_IMMEDIATELY` is unset | `true` |
 | `LOG_DIR` | Log directory | `./logs` |
@@ -605,7 +605,7 @@ Common time reference:
 ### Local Scheduled Tasks
 
 ```bash
-# Start scheduled mode (default 18:00 execution)
+# Start scheduled mode (default 08:30 execution)
 python main.py --schedule
 
 # Or use crontab

@@ -99,7 +99,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             "dingtalk_stream_enabled": False,
             "feishu_stream_enabled": False,
             "schedule_enabled": False,
-            "schedule_time": "18:00",
+            "schedule_time": "08:30",
             "schedule_run_immediately": True,
             "run_immediately": True,
             "agent_event_monitor_enabled": False,
@@ -168,7 +168,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         with patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main._reload_runtime_config", return_value=config), \
-             patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
+             patch("main._build_schedule_time_provider", return_value=lambda: "08:30"), \
              patch("main.setup_logging"), \
              patch("main.run_full_analysis") as run_full_analysis, \
              patch("main.logger.warning") as warning_log, \
@@ -179,10 +179,10 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(
             scheduled_call,
             {
-                "schedule_time": "18:00",
+                "schedule_time": "08:30",
                 "run_immediately": True,
                 "background_tasks": [],
-                "resolved_schedule_time": "18:00",
+                "resolved_schedule_time": "08:30",
             },
         )
         run_full_analysis.assert_called_once_with(config, args, None)
@@ -253,7 +253,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         with patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main._reload_runtime_config", return_value=config) as reload_config, \
-             patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
+             patch("main._build_schedule_time_provider", return_value=lambda: "08:30"), \
              patch("main.setup_logging"), \
              patch("main.run_full_analysis") as run_full_analysis, \
              patch("src.services.alert_worker.AlertWorker", return_value=worker) as worker_cls, \
@@ -264,9 +264,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
         worker_cls.assert_called_once()
         self.assertIs(worker_cls.call_args.kwargs["config_provider"], reload_config)
         run_full_analysis.assert_not_called()
-        self.assertEqual(scheduled_call["schedule_time"], "18:00")
+        self.assertEqual(scheduled_call["schedule_time"], "08:30")
         self.assertEqual(scheduled_call["run_immediately"], True)
-        self.assertEqual(scheduled_call["resolved_schedule_time"], "18:00")
+        self.assertEqual(scheduled_call["resolved_schedule_time"], "08:30")
         self.assertEqual(len(scheduled_call["background_tasks"]), 1)
         background_task = scheduled_call["background_tasks"][0]
         self.assertEqual(background_task["name"], "agent_event_monitor")
@@ -302,7 +302,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         with patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main._reload_runtime_config", return_value=config), \
-             patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
+             patch("main._build_schedule_time_provider", return_value=lambda: "08:30"), \
              patch("main.setup_logging"), \
              patch("main.run_full_analysis") as run_full_analysis, \
              patch("src.services.alert_worker.AlertWorker", return_value=worker) as worker_cls, \
@@ -430,7 +430,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         start_bots.assert_not_called()
         run_full_analysis.assert_called_once_with(config, args, None)
-        self.assertEqual(scheduled_call["schedule_time"], "18:00")
+        self.assertEqual(scheduled_call["schedule_time"], "08:30")
         self.assertEqual(scheduled_call["run_immediately"], True)
         self.assertEqual(scheduled_call["background_tasks"], [])
         error_log.assert_called_once()
@@ -537,7 +537,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             "src.core.config_manager.ConfigManager.read_config_map",
             side_effect=RuntimeError("boom"),
         ):
-            provider = main._build_schedule_time_provider("18:00")
+            provider = main._build_schedule_time_provider("08:30")
 
             with self.assertRaisesRegex(RuntimeError, "boom"):
                 provider()
@@ -560,7 +560,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             self.assertEqual(provider(), "18:00")
 
     def test_schedule_time_provider_falls_back_to_system_default_on_clear(self) -> None:
-        """When SCHEDULE_TIME is cleared/removed from config, provider returns '18:00'."""
+        """When SCHEDULE_TIME is cleared/removed from config, provider returns '08:30'."""
         with patch.dict(
             os.environ,
             {"SCHEDULE_TIME": "09:30"},
@@ -574,10 +574,10 @@ class MainScheduleModeTestCase(unittest.TestCase):
             return_value={},
         ):
             provider = main._build_schedule_time_provider("09:30")
-            self.assertEqual(provider(), "18:00")
+            self.assertEqual(provider(), "08:30")
 
     def test_schedule_time_provider_falls_back_to_system_default_on_empty(self) -> None:
-        """When SCHEDULE_TIME is empty string in config, provider returns '18:00'."""
+        """When SCHEDULE_TIME is empty string in config, provider returns '08:30'."""
         with patch.dict(
             os.environ,
             {"SCHEDULE_TIME": "09:30"},
@@ -591,7 +591,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             return_value={"SCHEDULE_TIME": "  "},
         ):
             provider = main._build_schedule_time_provider("09:30")
-            self.assertEqual(provider(), "18:00")
+            self.assertEqual(provider(), "08:30")
 
     def test_single_run_keeps_cli_stock_override(self) -> None:
         args = self._make_args(stocks="600519,000001")

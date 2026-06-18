@@ -65,7 +65,7 @@ class Scheduler:
 
     def __init__(
         self,
-        schedule_time: str = "18:00",
+        schedule_time: str = "08:30",
         schedule_time_provider: Optional[Callable[[], str]] = None,
     ):
         """
@@ -307,7 +307,7 @@ class Scheduler:
 
 def run_with_schedule(
     task: Callable,
-    schedule_time: str = "18:00",
+    schedule_time: str = "08:30",
     run_immediately: bool = True,
     background_tasks: Optional[List[Dict[str, Any]]] = None,
     schedule_time_provider: Optional[Callable[[], str]] = None,

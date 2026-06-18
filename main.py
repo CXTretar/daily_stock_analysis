@@ -1065,12 +1065,12 @@ def _build_schedule_time_provider(default_schedule_time: str):
     Fallback order:
     1. Process-level env override (set before launch) → honour it.
     2. Persisted config file value (written by WebUI) → use it.
-    3. Documented system default ``"18:00"`` → always fall back here so
+    3. Documented system default ``"08:30"`` → always fall back here so
        that clearing SCHEDULE_TIME in WebUI correctly resets the schedule.
     """
     from src.core.config_manager import ConfigManager
 
-    _SYSTEM_DEFAULT_SCHEDULE_TIME = "18:00"
+    _SYSTEM_DEFAULT_SCHEDULE_TIME = "08:30"
     manager = ConfigManager()
 
     def _provider() -> str:

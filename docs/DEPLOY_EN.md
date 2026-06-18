@@ -199,7 +199,7 @@ journalctl -u stock-analyzer -f
 | Config Item | Default | Description |
 |--------|--------|------|
 | `SCHEDULE_ENABLED` | `false` | Enable scheduled tasks |
-| `SCHEDULE_TIME` | `18:00` | Daily execution time |
+| `SCHEDULE_TIME` | `08:30` | Daily execution time |
 | `MARKET_REVIEW_ENABLED` | `true` | Enable market review |
 | `ANSPIRE_API_KEYS` | - | Anspire LLM and news search (recommended) |
 | `AIHUBMIX_KEY` | - | AIHubMix one-key multi-model access (recommended) |

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - [改进] 将每日股票分析 GitHub Actions 默认触发时间调整为北京时间每天 08:30
+- [改进] 将内置定时推送默认时间同步调整为每天 08:30
 - [修复] AlphaSift 热点题材刷新在 EastMoney 瞬断且无缓存时返回友好空态，并让桌面更新保留 AlphaSift 热点缓存。
 - [修复] AlphaSift 默认 pin 切换到 fork commit，放量突破策略不再因 Sina 快照缺少实时量比字段而直接失败。
 - [修复] 问股从历史报告进入后的追问会持续携带当前标的，切回或重载已有会话时可从历史消息恢复基础当前标的，并由后端阻断未明确切换时的错误股票工具调用、交易所片段和指标缩写误路由。

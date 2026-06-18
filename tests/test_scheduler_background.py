@@ -113,7 +113,7 @@ class SchedulerBackgroundTaskTestCase(unittest.TestCase):
                     }],
                 )
 
-        self.assertEqual(order[:4], [("init", "18:00"), ("provider", False), ("background", "event_monitor"), ("daily", True)])
+        self.assertEqual(order[:4], [("init", "08:30"), ("provider", False), ("background", "event_monitor"), ("daily", True)])
 
     def test_scheduler_reloads_daily_job_when_schedule_time_changes(self):
         fake_schedule = _FakeScheduleModule()

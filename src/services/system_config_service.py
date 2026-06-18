@@ -1549,7 +1549,7 @@ class SystemConfigService:
             )
 
         if "SCHEDULE_TIME" in submitted_keys:
-            schedule_time = (current_map.get("SCHEDULE_TIME", "") or "").strip() or "18:00"
+            schedule_time = (current_map.get("SCHEDULE_TIME", "") or "").strip() or "08:30"
             warnings.append(
                 (
                     f"SCHEDULE_TIME={schedule_time} 已写入 .env。"
