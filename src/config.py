@@ -40,7 +40,7 @@ from src.llm import generation_params as llm_generation_params
 logger = logging.getLogger(__name__)
 
 DEFAULT_ALPHASIFT_INSTALL_SPEC = (
-    "git+https://github.com/CXTretar/alphasift.git@5d8ba5acd8ffc0c12ba8ffcac937f7af3984fa97"
+    "git+https://github.com/CXTretar/alphasift.git@d7f11e3e2987490e2530c747fdfc7d2049f6e947"
 )
 
 
