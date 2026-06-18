@@ -51,6 +51,7 @@ from src.report_language import (
 from bot.models import BotMessage
 from src.utils.sanitize import sanitize_diagnostic_text
 from src.utils.data_processing import normalize_model_used
+from src.report_time import format_report_date, format_report_timestamp
 from src.notification_sender import (
     AstrbotSender,
     CustomWebhookSender,
@@ -454,7 +455,7 @@ class NotificationService(
     ) -> str:
         """Generate short recommendation cards for the default simple push."""
         if report_date is None:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = format_report_date()
         report_language = self._get_report_language(results)
         is_en = report_language == "en"
         title = "Stock Recommendation Brief" if is_en else "股票推荐短报"
@@ -483,7 +484,7 @@ class NotificationService(
             lines.extend(self._build_simple_recommendation_card(result, report_language))
             lines.append("")
 
-        lines.append(f"*{generated_label}{colon}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        lines.append(f"*{generated_label}{colon}{format_report_timestamp()}*")
         models = self._collect_models_used(results)
         if models:
             lines.append(f"*{model_label}: {', '.join(models)}*")
@@ -952,7 +953,7 @@ class NotificationService(
             Markdown 格式的日报内容
         """
         if report_date is None:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = format_report_date()
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
 
@@ -961,7 +962,7 @@ class NotificationService(
             f"# 📅 {report_date} {labels['report_title']}",
             "",
             f"> {labels['analyzed_prefix']} **{len(results)}** {labels['stock_unit']} | "
-            f"{labels['generated_at_label']}：{datetime.now().strftime('%H:%M:%S')}",
+            f"{labels['generated_at_label']}：{format_report_timestamp('%H:%M:%S')}",
         ]
         self._append_market_status_line(report_lines, results, report_language)
         report_lines.extend(["---", ""])
@@ -1141,7 +1142,7 @@ class NotificationService(
         # 底部信息（去除免责声明）
         report_lines.extend([
             "",
-            f"*{labels['generated_at_label']}：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*",
+            f"*{labels['generated_at_label']}：{format_report_timestamp()}*",
         ])
         
         return "\n".join(report_lines)
@@ -1220,7 +1221,7 @@ class NotificationService(
                 return out
 
         if report_date is None:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = format_report_date()
 
         # 按评分排序（高分在前）
         sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
@@ -1489,7 +1490,7 @@ class NotificationService(
         # 底部（去除免责声明）
         report_lines.extend([
             "",
-            f"*{labels['generated_at_label']}：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*",
+            f"*{labels['generated_at_label']}：{format_report_timestamp()}*",
         ])
         models = self._collect_models_used(results)
         if models:
@@ -1517,14 +1518,14 @@ class NotificationService(
             out = render(
                 platform='wechat',
                 results=results,
-                report_date=datetime.now().strftime('%Y-%m-%d'),
+                report_date=format_report_date(),
                 summary_only=self._report_summary_only,
                 extra_context={"report_language": report_language},
             )
             if out:
                 return out
 
-        report_date = datetime.now().strftime('%Y-%m-%d')
+        report_date = format_report_date()
         
         # 按评分排序
         sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
@@ -1653,7 +1654,7 @@ class NotificationService(
                 lines.append("")
         
         # 底部
-        lines.append(f"*{labels['report_time_label']}: {datetime.now().strftime('%H:%M')}*")
+        lines.append(f"*{labels['report_time_label']}: {format_report_timestamp('%H:%M')}*")
         models = self._collect_models_used(results)
         if models:
             lines.append(f"*{labels['analysis_model_label']}: {', '.join(models)}*")
@@ -1672,7 +1673,7 @@ class NotificationService(
         Returns:
             精简版 Markdown 内容
         """
-        report_date = datetime.now().strftime('%Y-%m-%d')
+        report_date = format_report_date()
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
 
@@ -1753,7 +1754,7 @@ class NotificationService(
             Brief markdown content.
         """
         if report_date is None:
-            report_date = datetime.now().strftime('%Y-%m-%d')
+            report_date = format_report_date()
         report_language = self._get_report_language(results)
         labels = get_report_labels(report_language)
         config = get_config()
@@ -1793,7 +1794,7 @@ class NotificationService(
                 f"{labels['score_label']} {r.sentiment_score} | {one}"
             )
         lines.append("")
-        lines.append(f"*{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        lines.append(f"*{format_report_timestamp()}*")
         models = self._collect_models_used(results)
         if models:
             lines.append(f"*{labels['analysis_model_label']}: {', '.join(models)}*")
@@ -1811,7 +1812,7 @@ class NotificationService(
         """
         return self.generate_simple_recommendation_report(
             [result],
-            report_date=datetime.now().strftime('%Y-%m-%d %H:%M'),
+            report_date=format_report_timestamp('%Y-%m-%d %H:%M'),
         )
 
     # Display name mapping for realtime data sources

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 报告与通知中的生成时间固定按北京时间展示，避免 UTC 运行环境显示偏早 8 小时。
 - [改进] 升级 AlphaSift pin，内置 A 股策略不再推荐股价高于 300 元的候选。
 - [改进] 每日定时推送默认只发送个股短卡片推荐，不再自动执行大盘复盘；手动完整分析和 market-only 复盘入口保持可用。
 - [改进] `REPORT_TYPE=simple` 改为短卡片推荐格式，每支股票只保留建议、结论、仓位、关键点位和一条风险/催化提示。

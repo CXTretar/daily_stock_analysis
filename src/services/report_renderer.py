@@ -13,6 +13,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from src.report_time import format_report_date, format_report_timestamp
+
 from src.analyzer import AnalysisResult
 from src.config import get_config
 from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
@@ -89,8 +91,6 @@ def render(
     Returns:
         Rendered string, or None on error (caller should fallback).
     """
-    from datetime import datetime
-
     try:
         from jinja2 import Environment, FileSystemLoader, select_autoescape
     except ImportError:
@@ -98,7 +98,7 @@ def render(
         return None
 
     if report_date is None:
-        report_date = datetime.now().strftime("%Y-%m-%d")
+        report_date = format_report_date()
 
     templates_dir = _resolve_templates_dir()
     template_name = f"report_{platform}.j2"
@@ -144,7 +144,7 @@ def render(
                 models_used.append(model)
         models_used = list(dict.fromkeys(models_used))
 
-    report_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    report_timestamp = format_report_timestamp()
 
     def failed_checks(checklist: List[str]) -> List[str]:
         return [c for c in (checklist or []) if c.startswith("❌") or c.startswith("⚠️")]
