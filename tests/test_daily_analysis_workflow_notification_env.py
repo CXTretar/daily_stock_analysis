@@ -86,6 +86,18 @@ def test_daily_analysis_keeps_deferred_behavior_switches_unmapped() -> None:
         assert key not in env
 
 
+def test_scheduled_daily_analysis_skips_market_review_by_default() -> None:
+    workflow_text = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    assert 'if [ "$MODE" = "market-only" ]; then' in workflow_text
+    assert "python main.py --market-review $FORCE_RUN_ARG" in workflow_text
+    assert 'elif [ "$MODE" = "stocks-only" ] || [ "$MODE" = "stock-selection" ]; then' in workflow_text
+    assert "python main.py --no-market-review $FORCE_RUN_ARG" in workflow_text
+    assert 'elif [ "${{ github.event_name }}" = "schedule" ]; then' in workflow_text
+    assert "python main.py --no-market-review $FORCE_RUN_ARG" in workflow_text
+    assert "python main.py $FORCE_RUN_ARG" in workflow_text
+
+
 def test_notification_actions_env_table_matches_generated_output() -> None:
     current = extract_managed_block(NOTIFICATIONS_DOC_PATH.read_text(encoding="utf-8"))
     expected = generate_table()

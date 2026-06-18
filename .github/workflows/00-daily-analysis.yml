@@ -528,6 +528,8 @@ jobs:
             python main.py --market-review $FORCE_RUN_ARG
           elif [ "$MODE" = "stocks-only" ] || [ "$MODE" = "stock-selection" ]; then
             python main.py --no-market-review $FORCE_RUN_ARG
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            python main.py --no-market-review $FORCE_RUN_ARG
           else
             python main.py $FORCE_RUN_ARG
           fi

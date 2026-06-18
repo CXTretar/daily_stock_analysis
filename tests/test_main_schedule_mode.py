@@ -715,6 +715,40 @@ class MainScheduleModeTestCase(unittest.TestCase):
         run_with_lock.assert_called_once()
         refresh.assert_called_once_with(config)
 
+    def test_schedule_run_skips_market_review_by_default(self) -> None:
+        args = self._make_args(schedule=True)
+        config = self._make_config(
+            trading_day_check_enabled=False,
+            market_review_enabled=True,
+            daily_market_context_enabled=True,
+            no_market_review=False,
+            single_stock_notify=False,
+            merge_email_notification=False,
+            analysis_delay=0,
+            database_path=str(Path(self.temp_dir.name) / "stock_analysis.db"),
+        )
+        pipeline = MagicMock()
+        pipeline.run.return_value = []
+        pipeline_kwargs = {}
+
+        def build_pipeline(*args, **kwargs):
+            pipeline_kwargs.update(kwargs)
+            return pipeline
+
+        with patch.object(main, "_refresh_stock_index_cache_for_analysis") as refresh, \
+             patch("main._compute_trading_day_filter", return_value=([], "cn", False)), \
+             patch("src.core.pipeline.StockAnalysisPipeline", side_effect=build_pipeline), \
+             patch("main._prime_daily_market_context") as prime_context, \
+             patch("main._run_market_review_with_shared_lock") as run_with_lock:
+            main.run_full_analysis(config, args, [])
+
+        self.assertFalse(pipeline_kwargs["daily_market_context_enabled"])
+        self.assertFalse(pipeline_kwargs["daily_market_context_allow_generate"])
+        prime_context.assert_not_called()
+        run_with_lock.assert_not_called()
+        pipeline.run.assert_called_once()
+        refresh.assert_called_once_with(config)
+
     def test_run_full_analysis_primes_daily_market_context_before_stock_analysis(self) -> None:
         args = self._make_args()
         target_date = date(2026, 3, 26)
@@ -1414,7 +1448,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertFalse(get_context_kwargs["allow_generate"])
         self.assertFalse(get_context_kwargs["persist_market_review_history"])
 
-    def test_config_enabled_schedule_marks_market_review_source_as_schedule(self) -> None:
+    def test_config_enabled_schedule_skips_market_review_by_default(self) -> None:
         args = self._make_args(schedule=False)
         target_date = date(2026, 3, 26)
         config = self._make_config(
@@ -1436,14 +1470,11 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline), \
              patch("main._prime_daily_market_context", return_value=("", "")), \
              patch("main._run_market_review_with_shared_lock", return_value="market report") as run_with_lock, \
-             patch("src.core.market_review.run_market_review") as run_market_review:
+             patch("src.core.market_review.run_market_review"):
             main.run_full_analysis(config, args, ["600519"])
 
         pipeline.run.assert_called_once()
-        run_with_lock.assert_called_once()
-        call_args = run_with_lock.call_args
-        self.assertIs(call_args.args[1], run_market_review)
-        self.assertEqual(call_args.kwargs["trigger_source"], "schedule")
+        run_with_lock.assert_not_called()
 
     def test_market_review_mode_uses_shared_runtime_assembly(self) -> None:
         args = self._make_args(market_review=True)

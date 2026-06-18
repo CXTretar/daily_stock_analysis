@@ -161,7 +161,7 @@ First confirm whether `LITELLM_CONFIG` or `LLM_CHANNELS` is active, because eith
 **Solution**:
 1. **Auto-chunking**: Latest version implements automatic long message splitting
 2. **Single stock push mode**: Set `SINGLE_STOCK_NOTIFY=true`, push immediately after each stock analysis
-3. **Brief report**: Set `REPORT_TYPE=simple` for simplified format
+3. **Short recommendation cards**: Set `REPORT_TYPE=simple` for 3-5 lines per stock; use `full` when you need the complete dashboard
 
 ---
 

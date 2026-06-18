@@ -2790,7 +2790,7 @@ class StockAnalysisPipeline:
                     logger.info(f"[{stock_code}] 使用简洁报告格式")
                 else:
                     report_content = self.notifier.generate_single_stock_report(result)
-                    logger.info(f"[{stock_code}] 使用精简报告格式")
+                    logger.info(f"[{stock_code}] 使用短卡片推荐格式")
 
                 sent = self.notifier.send(
                     report_content,

@@ -114,7 +114,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | Secret Name | Description | Required |
 |------------|------|:----:|
 | `SINGLE_STOCK_NOTIFY` | Single stock push mode: set to `true` to push immediately after each stock analysis | Optional |
-| `REPORT_TYPE` | Report type: `simple` (concise), `full` (complete), `brief` (3-5 sentences), Docker recommended: `full` | Optional |
+| `REPORT_TYPE` | Report type: `simple` (short recommendation cards, default daily push), `full`/`detailed` (complete dashboard), `brief` (one-line summary per stock), set `full` when you need complete content | Optional |
 | `REPORT_LANGUAGE` | Report output language: `zh` (default Chinese) / `en` (English); also updates prompt instructions, templates, notification fallbacks, and fixed copy in the Web report view. The bundled `00-daily-analysis.yml` already maps this variable, so setting it in Actions Secrets/Variables works out of the box | Optional |
 | `REPORT_SHOW_LLM_MODEL` | Whether notification report footers show the LLM model used for analysis. Defaults to `true`; set to `false` to hide runtime model metadata. This switch only affects presentation and does not change provider/model/Base URL, LiteLLM routing, or runtime model save/migration/cleanup behavior. | Optional |
 | `REPORT_TEMPLATES_DIR` | Jinja2 template directory (relative to project root, default `templates`) | Optional |
@@ -352,11 +352,11 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 |--------|------|--------|
 | `STOCK_LIST` | Watchlist codes (comma-separated) | - |
 | `MAX_WORKERS` | Concurrent threads | `3` |
-| `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
+| `MARKET_REVIEW_ENABLED` | Enable market review for manual full analysis; scheduled runs still skip market review by default | `true` |
 | `DAILY_MARKET_CONTEXT_ENABLED` | Inject the daily market context into stock-analysis prompts and soften aggressive buy advice in high-risk/risk-off markets; enabled by default, and market review can still run when this is set to `false` | `true` |
 | `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), hk (HK stocks), us (US stocks), both (all three markets) | `cn` |
 | `MARKET_REVIEW_COLOR_SCHEME` | Index change color style in market reviews: `green_up` = green gains/red losses (default), `red_up` = red gains/green losses | `green_up` |
-| `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
+| `SCHEDULE_ENABLED` | Enable scheduled tasks; default pushes only short stock recommendation cards | `false` |
 | `SCHEDULE_TIME` | Scheduled execution time | `08:30` |
 | `SCHEDULE_RUN_IMMEDIATELY` | Run once immediately when scheduler mode starts; when unset it keeps following the legacy `RUN_IMMEDIATELY` runtime override | `true` |
 | `RUN_IMMEDIATELY` | Run once immediately for non-scheduler startup; also acts as the legacy fallback when `SCHEDULE_RUN_IMMEDIATELY` is unset | `true` |
@@ -573,7 +573,7 @@ python main.py --no-market-review     # Stock analysis only
 python main.py --stocks 600519,300750 # Specify stocks
 python main.py --dry-run              # Fetch data only, no AI analysis
 python main.py --no-notify            # Don't send notifications
-python main.py --schedule             # Scheduled task mode
+python main.py --schedule             # Scheduled mode (stock recommendation cards only by default)
 python main.py --debug                # Debug mode (verbose logging)
 python main.py --workers 5            # Specify concurrency
 ```
@@ -592,6 +592,8 @@ schedule:
   - cron: '30 0 * * *'     # Daily 08:30 (Beijing Time)
 ```
 
+Scheduled triggers run `python main.py --no-market-review` by default and only push short stock recommendation cards. Manual `full` runs still execute stocks plus market review, and `market-only` still runs only the market review.
+
 Common time reference:
 
 | Beijing Time | UTC cron expression |
@@ -604,8 +606,10 @@ Common time reference:
 
 ### Local Scheduled Tasks
 
+The built-in scheduler runs stock recommendation analysis at the configured time and skips market review by default to keep daily pushes short.
+
 ```bash
-# Start scheduled mode (default 08:30 execution)
+# Start scheduled mode (default 08:30 stock recommendation run)
 python main.py --schedule
 
 # Or use crontab
@@ -613,7 +617,7 @@ crontab -e
 # Add: 0 18 * * 1-5 cd /path/to/project && python main.py
 ```
 
-> Note: Scheduled mode reloads the saved `STOCK_LIST` before each run. If you also pass `--stocks`, it will not pin future scheduled executions to the startup snapshot; use a normal one-off run when you want to analyze a temporary stock list.
+> Note: Scheduled mode reloads the saved `STOCK_LIST` before each run and pushes only short stock recommendation cards by default. Run `python main.py --market-review` or use the GitHub Actions manual `market-only/full` modes when you need market review. If you also pass `--stocks`, it will not pin future scheduled executions to the startup snapshot; use a normal one-off run when you want to analyze a temporary stock list.
 >
 > When the built-in scheduler is started via `python main.py --schedule`, `python main.py --serve --schedule`, or an equivalent local mode, saving a new `SCHEDULE_TIME` from the WebUI will rebind the daily job on the next scheduler poll without restarting the process. The previous trigger time is removed instead of being kept alongside the new one.
 

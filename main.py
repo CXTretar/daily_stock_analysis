@@ -676,11 +676,17 @@ def run_full_analysis(
         if getattr(args, 'single_notify', False):
             config.single_stock_notify = True
 
+        schedule_mode = bool(
+            getattr(args, 'schedule', False)
+            or getattr(config, 'schedule_enabled', False)
+        )
+
         # Issue #190: 个股与大盘复盘合并推送
         merge_notification = (
             getattr(config, 'merge_email_notification', False)
             and config.market_review_enabled
             and not getattr(args, 'no_market_review', False)
+            and not schedule_mode
             and not config.single_stock_notify
         )
 
@@ -697,8 +703,11 @@ def run_full_analysis(
         should_run_market_review = (
             config.market_review_enabled
             and not args.no_market_review
+            and not schedule_mode
             and (market_review_region or '') != ''
         )
+        if schedule_mode and config.market_review_enabled and not args.no_market_review:
+            logger.info("定时分析默认跳过大盘复盘，仅推送个股推荐；手动复盘请使用 --market-review。")
         should_use_daily_market_context = (
             should_run_market_review
             and getattr(config, 'daily_market_context_enabled', True)
@@ -779,10 +788,6 @@ def run_full_analysis(
 
         # 2. 运行大盘复盘（如果启用且不是仅个股模式）
         if should_run_market_review:
-            schedule_mode = bool(
-                getattr(args, 'schedule', False)
-                or getattr(config, 'schedule_enabled', False)
-            )
             review_trigger_source = "schedule" if schedule_mode else "cli"
             can_reuse_market_context = (
                 _can_reuse_market_context_for_review(

@@ -822,7 +822,7 @@ class Config:
     # 单股推送模式：每分析完一只股票立即推送，而不是汇总后推送
     single_stock_notify: bool = False
 
-    # 报告类型：simple(精简) 或 full(完整)
+    # 报告类型：simple(短卡片推荐)、full(完整仪表盘)、brief(每股一行概括)
     report_type: str = "simple"
     report_language: str = "zh"
 

@@ -562,19 +562,20 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             analysis_summary="稳健",
         )
 
-        with mock.patch.object(service, "generate_dashboard_report", return_value="dashboard") as mock_dashboard, mock.patch.object(
-            service, "generate_brief_report", return_value="brief"
-        ) as mock_brief:
-            self.assertEqual(service.generate_aggregate_report([result], "simple"), "dashboard")
+        with mock.patch.object(service, "generate_simple_recommendation_report", return_value="simple-cards") as mock_simple, \
+             mock.patch.object(service, "generate_dashboard_report", return_value="dashboard") as mock_dashboard, \
+             mock.patch.object(service, "generate_brief_report", return_value="brief") as mock_brief:
+            self.assertEqual(service.generate_aggregate_report([result], "simple"), "simple-cards")
             self.assertEqual(service.generate_aggregate_report([result], "full"), "dashboard")
             self.assertEqual(service.generate_aggregate_report([result], "detailed"), "dashboard")
             self.assertEqual(service.generate_aggregate_report([result], "brief"), "brief")
 
-        self.assertEqual(mock_dashboard.call_count, 3)
+        mock_simple.assert_called_once()
+        self.assertEqual(mock_dashboard.call_count, 2)
         mock_brief.assert_called_once()
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_keeps_legacy_simple_format(self, mock_get_config: mock.MagicMock):
+    def test_generate_single_stock_report_uses_compact_simple_card(self, mock_get_config: mock.MagicMock):
         mock_get_config.return_value = _make_config(report_renderer_enabled=True)
         service = NotificationService()
         result = AnalysisResult(
@@ -584,6 +585,26 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             trend_prediction="看多",
             operation_advice="持有",
             analysis_summary="稳健",
+            dashboard={
+                "core_conclusion": {
+                    "one_sentence": "趋势稳健，适合等待低吸。",
+                    "position_advice": {
+                        "no_position": "等待回踩",
+                        "has_position": "持有观察",
+                    },
+                },
+                "battle_plan": {
+                    "sniper_points": {
+                        "ideal_buy": "1680",
+                        "stop_loss": "1600",
+                        "take_profit": "1800",
+                    },
+                },
+                "intelligence": {
+                    "risk_alerts": ["白酒消费复苏不及预期，估值承压"],
+                    "positive_catalysts": ["分红稳定"],
+                },
+            },
         )
 
         with mock.patch("src.services.report_renderer.render") as mock_render:
@@ -592,6 +613,58 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_render.assert_not_called()
         self.assertIn("贵州茅台", out)
         self.assertIn("600519", out)
+        self.assertIn("建议", out)
+        self.assertIn("点位", out)
+        self.assertIn("仓位", out)
+        self.assertNotIn("数据透视", out)
+        self.assertNotIn("作战计划", out)
+        self.assertNotIn("基本面分析", out)
+
+    @mock.patch("src.notification.get_config")
+    def test_simple_recommendation_report_uses_short_cards(self, mock_get_config: mock.MagicMock):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        service = NotificationService()
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=72,
+            trend_prediction="看多",
+            operation_advice="持有",
+            analysis_summary="趋势稳健，等待低吸。",
+            dashboard={
+                "core_conclusion": {
+                    "one_sentence": "趋势稳健，适合等待低吸。",
+                    "position_advice": {
+                        "no_position": "等待回踩",
+                        "has_position": "持有观察",
+                    },
+                },
+                "battle_plan": {
+                    "sniper_points": {
+                        "ideal_buy": "1680",
+                        "stop_loss": "1600",
+                        "take_profit": "1800",
+                    },
+                },
+                "intelligence": {
+                    "risk_alerts": ["白酒消费复苏不及预期，估值承压"],
+                    "positive_catalysts": ["分红稳定"],
+                },
+            },
+        )
+
+        out = service.generate_simple_recommendation_report([result], report_date="2026-02-01")
+
+        self.assertIn("# 2026-02-01 股票推荐短报", out)
+        self.assertIn("贵州茅台 (600519)", out)
+        self.assertIn("建议：持有", out)
+        self.assertIn("结论：趋势稳健，适合等待低吸。", out)
+        self.assertIn("仓位：无仓 等待回踩；持仓 持有观察", out)
+        self.assertIn("点位：买入 1680 / 止损 1600 / 止盈 1800", out)
+        self.assertIn("提示：白酒消费复苏不及预期", out)
+        self.assertNotIn("数据透视", out)
+        self.assertNotIn("作战计划", out)
+        self.assertNotIn("基本面分析", out)
 
     @mock.patch("src.notification.get_config")
     def test_generate_brief_report_shows_model_by_default(self, mock_get_config: mock.MagicMock):
@@ -870,8 +943,9 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         out = service.generate_single_stock_report(result)
 
-        self.assertIn("Core Conclusion", out)
-        self.assertIn("Action Levels", out)
+        self.assertIn("Advice", out)
+        self.assertIn("Summary", out)
+        self.assertIn("Levels", out)
         self.assertIn("Hold", out)
 
     def _make_fundamental_context(self) -> dict:
@@ -929,7 +1003,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         }
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_appends_fundamental_blocks(
+    def test_generate_dashboard_report_appends_fundamental_blocks(
         self, mock_get_config: mock.MagicMock
     ):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
@@ -944,7 +1018,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         )
         result.fundamental_context = self._make_fundamental_context()
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         # 财务摘要
         self.assertIn("财务摘要", out)
@@ -966,7 +1040,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("MSCI中国", out)
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_skips_fundamental_blocks_when_missing(
+    def test_generate_dashboard_report_skips_fundamental_blocks_when_missing(
         self, mock_get_config: mock.MagicMock
     ):
         mock_get_config.return_value = _make_config(report_renderer_enabled=False)
@@ -980,14 +1054,14 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             analysis_summary="稳健",
         )
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertNotIn("财务摘要", out)
         self.assertNotIn("股东回报", out)
         self.assertNotIn("关联板块", out)
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_handles_partial_fundamental_context(
+    def test_generate_dashboard_report_handles_partial_fundamental_context(
         self, mock_get_config: mock.MagicMock
     ):
         """Only dividend data present — render shareholder return, skip the other two."""
@@ -1014,7 +1088,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             },
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertNotIn("财务摘要", out)
         self.assertIn("股东回报", out)
@@ -1022,7 +1096,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertNotIn("关联板块", out)
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_uses_currency_for_us(
+    def test_generate_dashboard_report_uses_currency_for_us(
         self, mock_get_config: mock.MagicMock
     ):
         """USD currency on financial_report yields 亿美元 suffix instead of 亿元."""
@@ -1068,7 +1142,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             ],
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertIn("财务摘要", out)
         self.assertIn("亿美元", out)
@@ -1112,7 +1186,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             ],
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertIn("关联板块", out)
         self.assertIn("Technology", out)
@@ -1149,7 +1223,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             ],
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertIn("关联板块", out)
         self.assertIn("白酒Ⅲ / 白酒Ⅱ / 食品饮料 / 贵州板块 / 酿酒概念", out)
@@ -1184,7 +1258,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             ],
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         self.assertIn("板块表现", out)
         self.assertIn("板块涨跌幅", out)
@@ -1194,7 +1268,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertIn("MSCI中国", out)
 
     @mock.patch("src.notification.get_config")
-    def test_generate_single_stock_report_uses_currency_for_hk(
+    def test_generate_dashboard_report_uses_currency_for_hk(
         self, mock_get_config: mock.MagicMock
     ):
         """HK ADRs have financialCurrency=CNY but trade/pay dividends in HKD.
@@ -1247,7 +1321,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             ],
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         # Income statement still rendered in CNY (financialCurrency).
         self.assertIn("10200.00 亿元", out)
@@ -1285,7 +1359,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             },
         }
 
-        out = service.generate_single_stock_report(result)
+        out = service.generate_dashboard_report([result])
 
         # Without explicit dividend currency, default to 元 (matches AkShare A-share semantics).
         self.assertIn("27.6000 元", out)

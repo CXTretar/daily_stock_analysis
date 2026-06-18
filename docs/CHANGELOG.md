@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] 每日定时推送默认只发送个股短卡片推荐，不再自动执行大盘复盘；手动完整分析和 market-only 复盘入口保持可用。
+- [改进] `REPORT_TYPE=simple` 改为短卡片推荐格式，每支股票只保留建议、结论、仓位、关键点位和一条风险/催化提示。
 - [改进] 将每日股票分析 GitHub Actions 默认触发时间调整为北京时间每天 08:30
 - [改进] 将内置定时推送默认时间同步调整为每天 08:30
 - [修复] AlphaSift 热点题材刷新在 EastMoney 瞬断且无缓存时返回友好空态，并让桌面更新保留 AlphaSift 热点缓存。

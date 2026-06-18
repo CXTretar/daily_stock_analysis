@@ -72,6 +72,11 @@ from src.notification_sender import (
 
 logger = logging.getLogger(__name__)
 
+# 短卡片单字段长度上限：控制群推送可读性，避免单只股票摘要重新膨胀成完整报告。
+SIMPLE_CARD_SUMMARY_MAX_CHARS = 80
+# 短卡片提示长度上限：保留最关键风险/催化，避免推送消息过长。
+SIMPLE_CARD_NOTE_MAX_CHARS = 60
+
 
 def _safe_float(value: Any) -> Optional[float]:
     """Best-effort float conversion; handles `"3.2%"` and `"1,234"` shapes."""
@@ -324,9 +329,165 @@ class NotificationService(
     ) -> str:
         """Generate the aggregate report content used by merge/save/push paths."""
         normalized_type = self._normalize_report_type(report_type)
+        if normalized_type == ReportType.SIMPLE:
+            return self.generate_simple_recommendation_report(results, report_date=report_date)
         if normalized_type == ReportType.BRIEF:
             return self.generate_brief_report(results, report_date=report_date)
         return self.generate_dashboard_report(results, report_date=report_date)
+
+    def _compact_card_text(self, value: Any, max_chars: int) -> str:
+        """Normalize one short-card field and trim it to the push-friendly limit."""
+        if value is None:
+            return ""
+        text = " ".join(str(value).strip().split())
+        if len(text) <= max_chars:
+            return text
+        return text[:max_chars].rstrip() + "..."
+
+    def _first_compact_item(self, value: Any, max_chars: int) -> str:
+        """Return the first useful list/scalar value for a compact card field."""
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                text = self._compact_card_text(item, max_chars)
+                if text:
+                    return text
+            return ""
+        return self._compact_card_text(value, max_chars)
+
+    def _build_simple_recommendation_card(
+        self,
+        result: AnalysisResult,
+        report_language: str,
+    ) -> List[str]:
+        """Build a 3-5 line stock recommendation card for default pushes."""
+        _, signal_emoji, _ = self._get_signal_level(result)
+        dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
+        core = dashboard.get('core_conclusion', {}) if dashboard else {}
+        battle = dashboard.get('battle_plan', {}) if dashboard else {}
+        intel = dashboard.get('intelligence', {}) if dashboard else {}
+
+        is_en = report_language == "en"
+        colon = ":" if is_en else "："
+        semicolon = "; " if is_en else "；"
+        labels = {
+            "advice": "Advice" if is_en else "建议",
+            "score": "Score" if is_en else "评分",
+            "trend": "Trend" if is_en else "趋势",
+            "summary": "Summary" if is_en else "结论",
+            "position": "Position" if is_en else "仓位",
+            "no_position": "No position" if is_en else "无仓",
+            "holding": "Holding" if is_en else "持仓",
+            "levels": "Levels" if is_en else "点位",
+            "buy": "Buy" if is_en else "买入",
+            "stop": "Stop" if is_en else "止损",
+            "target": "Target" if is_en else "止盈",
+            "note": "Note" if is_en else "提示",
+        }
+
+        stock_name = self._get_display_name(result, report_language)
+        action = localize_operation_advice(result.operation_advice, report_language)
+        trend = localize_trend_prediction(result.trend_prediction, report_language)
+        lines = [
+            (
+                f"### {signal_emoji} {stock_name} ({result.code}) | "
+                f"{labels['advice']}{colon}{action} | "
+                f"{labels['score']}{colon}{result.sentiment_score} | "
+                f"{labels['trend']}{colon}{trend}"
+            )
+        ]
+
+        one_sentence = core.get('one_sentence') if core else ""
+        summary = self._compact_card_text(
+            one_sentence or getattr(result, "analysis_summary", "") or getattr(result, "buy_reason", ""),
+            SIMPLE_CARD_SUMMARY_MAX_CHARS,
+        )
+        if summary:
+            lines.append(f"{labels['summary']}{colon}{summary}")
+
+        pos_advice = core.get('position_advice', {}) if core else {}
+        position_parts = []
+        if isinstance(pos_advice, dict):
+            no_position = self._compact_card_text(pos_advice.get('no_position'), SIMPLE_CARD_SUMMARY_MAX_CHARS)
+            has_position = self._compact_card_text(pos_advice.get('has_position'), SIMPLE_CARD_SUMMARY_MAX_CHARS)
+            if no_position:
+                position_parts.append(f"{labels['no_position']} {no_position}")
+            if has_position:
+                position_parts.append(f"{labels['holding']} {has_position}")
+        position = battle.get('position_strategy', {}) if battle else {}
+        if not position_parts and isinstance(position, dict):
+            suggested = self._compact_card_text(position.get('suggested_position'), SIMPLE_CARD_SUMMARY_MAX_CHARS)
+            if suggested:
+                position_parts.append(suggested)
+        if position_parts:
+            lines.append(f"{labels['position']}{colon}" + semicolon.join(position_parts))
+
+        sniper = battle.get('sniper_points', {}) if battle else {}
+        level_parts = []
+        if isinstance(sniper, dict):
+            for key, label in (
+                ('ideal_buy', labels['buy']),
+                ('stop_loss', labels['stop']),
+                ('take_profit', labels['target']),
+            ):
+                value = self._clean_sniper_value(sniper.get(key, ""))
+                if value and value not in {"-", "N/A"}:
+                    level_parts.append(f"{label} {value}")
+        if level_parts:
+            lines.append(f"{labels['levels']}{colon}" + " / ".join(level_parts))
+
+        note = ""
+        if isinstance(intel, dict):
+            note = self._first_compact_item(intel.get('risk_alerts'), SIMPLE_CARD_NOTE_MAX_CHARS)
+            if not note:
+                note = self._first_compact_item(intel.get('positive_catalysts'), SIMPLE_CARD_NOTE_MAX_CHARS)
+        if not note:
+            note = self._compact_card_text(getattr(result, "risk_warning", ""), SIMPLE_CARD_NOTE_MAX_CHARS)
+        if note:
+            lines.append(f"{labels['note']}{colon}{note}")
+
+        return lines[:5]
+
+    def generate_simple_recommendation_report(
+        self,
+        results: List[AnalysisResult],
+        report_date: Optional[str] = None,
+    ) -> str:
+        """Generate short recommendation cards for the default simple push."""
+        if report_date is None:
+            report_date = datetime.now().strftime('%Y-%m-%d')
+        report_language = self._get_report_language(results)
+        is_en = report_language == "en"
+        title = "Stock Recommendation Brief" if is_en else "股票推荐短报"
+        no_results = "No analysis results." if is_en else "暂无分析结果"
+        stock_unit = "stocks" if is_en else "只"
+        generated_label = "Generated at" if is_en else "生成时间"
+        model_label = "Analysis model" if is_en else "分析模型"
+        colon = ":" if is_en else "："
+
+        if not results:
+            return f"# {report_date} {title}\n\n{no_results}"
+
+        sorted_results = sorted(results, key=lambda x: x.sentiment_score, reverse=True)
+        buy_count = sum(1 for r in results if getattr(r, 'decision_type', '') == 'buy')
+        sell_count = sum(1 for r in results if getattr(r, 'decision_type', '') == 'sell')
+        hold_count = sum(1 for r in results if getattr(r, 'decision_type', '') in ('hold', ''))
+        lines = [
+            f"# {report_date} {title}",
+            "",
+            f"> {len(results)} {stock_unit} | 🟢{buy_count} 🟡{hold_count} 🔴{sell_count}",
+        ]
+        self._append_market_status_line(lines, results, report_language)
+        lines.append("")
+
+        for result in sorted_results:
+            lines.extend(self._build_simple_recommendation_card(result, report_language))
+            lines.append("")
+
+        lines.append(f"*{generated_label}{colon}{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        models = self._collect_models_used(results)
+        if models:
+            lines.append(f"*{model_label}: {', '.join(models)}*")
+        return "\n".join(lines)
 
     def _collect_models_used(self, results: List[AnalysisResult]) -> List[str]:
         if not self._should_show_llm_model():
@@ -1640,9 +1801,7 @@ class NotificationService(
 
     def generate_single_stock_report(self, result: AnalysisResult) -> str:
         """
-        生成单只股票的分析报告（用于单股推送模式 #55）
-        
-        格式精简但信息完整，适合每分析完一只股票立即推送
+        生成单只股票的短卡片报告（用于单股推送模式 #55）
         
         Args:
             result: 单只股票的分析结果
@@ -1650,118 +1809,10 @@ class NotificationService(
         Returns:
             Markdown 格式的单股报告
         """
-        report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
-        report_language = self._get_report_language(result)
-        labels = get_report_labels(report_language)
-        signal_text, signal_emoji, _ = self._get_signal_level(result)
-        dashboard = result.dashboard if hasattr(result, 'dashboard') and result.dashboard else {}
-        core = dashboard.get('core_conclusion', {}) if dashboard else {}
-        battle = dashboard.get('battle_plan', {}) if dashboard else {}
-        intel = dashboard.get('intelligence', {}) if dashboard else {}
-        
-        # 股票名称（转义 *ST 等特殊字符）
-        stock_name = self._get_display_name(result, report_language)
-        
-        lines = [
-            f"## {signal_emoji} {stock_name} ({result.code})",
-            "",
-            f"> {report_date} | {labels['score_label']}: **{result.sentiment_score}** | {localize_trend_prediction(result.trend_prediction, report_language)}",
-            "",
-        ]
-
-        excerpt = self._public_phase_pack_excerpt(result, report_language)
-        if excerpt:
-            lines.extend([excerpt, ""])
-
-        self._append_market_snapshot(lines, result)
-        
-        # 核心决策（一句话）
-        one_sentence = core.get('one_sentence', result.analysis_summary) if core else result.analysis_summary
-        if one_sentence:
-            lines.extend([
-                f"### 📌 {labels['core_conclusion_heading']}",
-                "",
-                f"**{signal_text}**: {one_sentence}",
-                "",
-            ])
-        
-        # 重要信息（舆情+基本面）
-        info_added = False
-        if intel:
-            if intel.get('earnings_outlook'):
-                if not info_added:
-                    lines.append(f"### 📰 {labels['info_heading']}")
-                    lines.append("")
-                    info_added = True
-                lines.append(f"📊 **{labels['earnings_outlook_label']}**: {str(intel['earnings_outlook'])[:100]}")
-            
-            if intel.get('sentiment_summary'):
-                if not info_added:
-                    lines.append(f"### 📰 {labels['info_heading']}")
-                    lines.append("")
-                    info_added = True
-                lines.append(f"💭 **{labels['sentiment_summary_label']}**: {str(intel['sentiment_summary'])[:80]}")
-            
-            # 风险警报
-            risks = intel.get('risk_alerts', [])
-            if risks:
-                if not info_added:
-                    lines.append(f"### 📰 {labels['info_heading']}")
-                    lines.append("")
-                    info_added = True
-                lines.append("")
-                lines.append(f"🚨 **{labels['risk_alerts_label']}**:")
-                for risk in risks[:3]:
-                    lines.append(f"- {str(risk)[:60]}")
-            
-            # 利好催化
-            catalysts = intel.get('positive_catalysts', [])
-            if catalysts:
-                lines.append("")
-                lines.append(f"✨ **{labels['positive_catalysts_label']}**:")
-                for cat in catalysts[:3]:
-                    lines.append(f"- {str(cat)[:60]}")
-        
-        if info_added:
-            lines.append("")
-        
-        # 狙击点位
-        sniper = battle.get('sniper_points', {}) if battle else {}
-        if sniper:
-            lines.extend([
-                f"### 🎯 {labels['action_points_heading']}",
-                "",
-                f"| {labels['ideal_buy_label']} | {labels['stop_loss_label']} | {labels['take_profit_label']} |",
-                "|------|------|------|",
-            ])
-            ideal_buy = sniper.get('ideal_buy', '-')
-            stop_loss = sniper.get('stop_loss', '-')
-            take_profit = sniper.get('take_profit', '-')
-            lines.append(f"| {ideal_buy} | {stop_loss} | {take_profit} |")
-            lines.append("")
-        
-        # 持仓建议
-        pos_advice = core.get('position_advice', {}) if core else {}
-        if pos_advice:
-            lines.extend([
-                f"### 💼 {labels['position_advice_heading']}",
-                "",
-                f"- 🆕 **{labels['no_position_label']}**: {pos_advice.get('no_position', localize_operation_advice(result.operation_advice, report_language))}",
-                f"- 💼 **{labels['has_position_label']}**: {pos_advice.get('has_position', labels['continue_holding'])}",
-                "",
-            ])
-
-        # 财务摘要 / 股东回报 / 关联板块（数据缺失时自动隐藏对应小节）
-        self._append_fundamental_blocks(lines, result)
-
-        lines.append("---")
-        if self._should_show_llm_model():
-            model_used = normalize_model_used(getattr(result, "model_used", None))
-            if model_used:
-                lines.append(f"*{labels['analysis_model_label']}: {model_used}*")
-        lines.append(f"*{labels['not_investment_advice']}*")
-
-        return "\n".join(lines)
+        return self.generate_simple_recommendation_report(
+            [result],
+            report_date=datetime.now().strftime('%Y-%m-%d %H:%M'),
+        )
 
     # Display name mapping for realtime data sources
     _SOURCE_DISPLAY_NAMES = {
