@@ -413,13 +413,15 @@ git push
 
 ### Schedule Details
 
-Default configuration: **daily, 08:30 Beijing Time** auto-trigger
+Default configuration: primary trigger **daily at 08:30 Beijing Time**, with backup triggers at 09:17 and 10:47. The backups reduce the chance of missing a day when GitHub Actions `schedule` is delayed or dropped. After a scheduled run succeeds, the workflow stores a Beijing-date marker so later scheduled triggers on the same day skip the heavy analysis and push.
 
 Modify time: Edit cron expression in `.github/workflows/00-daily-analysis.yml`:
 
 ```yaml
 schedule:
-  - cron: '30 0 * * *'  # UTC time, +8 = Beijing time
+  - cron: '30 0 * * *'  # Primary trigger, daily 08:30 (Beijing)
+  - cron: '17 1 * * *'  # Backup trigger, daily 09:17 (Beijing)
+  - cron: '47 2 * * *'  # Second backup trigger, daily 10:47 (Beijing)
 ```
 
 Common cron examples:
@@ -444,7 +446,7 @@ git push
 ### FAQ
 
 **Q: Why isn't the scheduled task running?**
-A: GitHub Actions scheduled tasks may have 5-15 minute delays, and only trigger when repo has activity. Long periods without commits may cause workflow to be disabled.
+A: GitHub Actions scheduled tasks can be delayed or dropped under platform load. The default workflow includes staggered backup triggers and same-day deduplication, but long periods without commits may still cause public-repo scheduled workflows to be disabled.
 
 **Q: How to view historical reports?**
 A: Actions → Select run record → Artifacts → Download `analysis-reports-xxx`

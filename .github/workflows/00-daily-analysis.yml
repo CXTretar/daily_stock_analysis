@@ -1,9 +1,11 @@
 name: 每日股票分析
 
 on:
-  # 定时触发 - 每天北京时间 08:30 (UTC 00:30)
+  # 定时触发 - 主触发为每天北京时间 08:30；备份触发用于降低 GitHub schedule 延迟或丢弃的影响。
   schedule:
     - cron: '30 0 * * *'       # 每天，UTC 00:30 = 北京时间 08:30
+    - cron: '17 1 * * *'       # 备份触发，错开整点高峰，UTC 01:17 = 北京时间 09:17
+    - cron: '47 2 * * *'       # 二次备份触发，继续错峰，UTC 02:47 = 北京时间 10:47
   
   # 手动触发
   workflow_dispatch:
@@ -38,26 +40,64 @@ jobs:
     steps:
       - name: 随机延迟（避免固定时间访问）
         run: sleep $((RANDOM % 60))  # 随机延迟0-60秒启动
+
+      - name: 计算每日运行标记
+        id: daily-run-date
+        run: |
+          RUN_DATE="$(TZ='Asia/Shanghai' date '+%Y%m%d')"
+          echo "date=$RUN_DATE" >> "$GITHUB_OUTPUT"
+          echo "marker_path=.daily-analysis-run/$RUN_DATE" >> "$GITHUB_OUTPUT"
+          echo "DSA_RUN_DATE=$RUN_DATE" >> "$GITHUB_ENV"
+
+      - name: 读取每日去重标记
+        id: daily-run-marker
+        if: ${{ github.event_name == 'schedule' }}
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: .daily-analysis-run
+          key: dsa-daily-analysis-${{ steps.daily-run-date.outputs.date }}
+
+      - name: 判断是否需要执行
+        id: daily-dedup
+        env:
+          CACHE_HIT: ${{ steps.daily-run-marker.outputs.cache-hit }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$CACHE_HIT" = "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "当天北京时间 $DSA_RUN_DATE 已有成功的定时分析，本次备份触发跳过。"
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 跳过重复定时触发
+        if: ${{ steps.daily-dedup.outputs.should_run != 'true' }}
+        run: echo "已跳过重复的每日股票分析定时触发。"
       
       - name: 检出代码
+        if: ${{ steps.daily-dedup.outputs.should_run == 'true' }}
         uses: actions/checkout@v5
       
       - name: 设置 Python 环境
+        if: ${{ steps.daily-dedup.outputs.should_run == 'true' }}
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
       
       - name: 安装依赖
+        if: ${{ steps.daily-dedup.outputs.should_run == 'true' }}
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: 创建必要目录
+        if: ${{ steps.daily-dedup.outputs.should_run == 'true' }}
         run: |
           mkdir -p data logs reports
       
       - name: 执行股票分析
+        if: ${{ steps.daily-dedup.outputs.should_run == 'true' }}
         env:
           # ==========================================
           # AI 配置
@@ -533,10 +573,28 @@ jobs:
           else
             python main.py $FORCE_RUN_ARG
           fi
+
+      - name: 写入每日去重标记
+        if: ${{ success() && github.event_name == 'schedule' && steps.daily-dedup.outputs.should_run == 'true' }}
+        run: |
+          mkdir -p .daily-analysis-run
+          {
+            echo "date=${{ steps.daily-run-date.outputs.date }}"
+            echo "run_id=${{ github.run_id }}"
+            echo "run_attempt=${{ github.run_attempt }}"
+          } > "${{ steps.daily-run-date.outputs.marker_path }}"
+
+      - name: 保存每日去重标记
+        if: ${{ success() && github.event_name == 'schedule' && steps.daily-dedup.outputs.should_run == 'true' && steps.daily-run-marker.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .daily-analysis-run
+          key: dsa-daily-analysis-${{ steps.daily-run-date.outputs.date }}
       
       - name: 上传分析报告
         uses: actions/upload-artifact@v6
-        if: always()
+        if: ${{ always() && steps.daily-dedup.outputs.should_run == 'true' }}
         with:
           name: analysis-reports-${{ github.run_number }}
           path: |
@@ -545,7 +603,7 @@ jobs:
           retention-days: 30
       
       - name: 显示运行结果
-        if: always()
+        if: ${{ always() && steps.daily-dedup.outputs.should_run == 'true' }}
         run: |
           echo ""
           echo "=========================================="
@@ -562,3 +620,85 @@ jobs:
             echo "📜 最近日志（最后 30 行）:"
             tail -30 logs/stock_analysis_*.log 2>/dev/null || echo "无日志"
           fi
+
+      - name: 失败兜底通知
+        if: ${{ failure() && steps.daily-dedup.outputs.should_run == 'true' }}
+        env:
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          PUSHPLUS_TOPIC: ${{ secrets.PUSHPLUS_TOPIC }}
+          SERVERCHAN3_SENDKEY: ${{ secrets.SERVERCHAN3_SENDKEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_MESSAGE_THREAD_ID: ${{ secrets.TELEGRAM_MESSAGE_THREAD_ID }}
+        run: |
+          set +e
+
+          TITLE="【每日股票分析】失败告警 ${{ steps.daily-run-date.outputs.date }}"
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTENT="$(cat <<EOF
+          run_id: ${{ github.run_id }}
+          run_attempt: ${{ github.run_attempt }}
+          workflow: ${WORKFLOW_URL}
+          EOF
+          )"
+          json_escape() {
+            local value="${1//\\/\\\\}"
+            value="${value//\"/\\\"}"
+            value="${value//$'\n'/\\n}"
+            printf '%s' "$value"
+          }
+
+          TITLE_JSON="$(json_escape "$TITLE")"
+          CONTENT_JSON="$(json_escape "$CONTENT")"
+
+          if [ -n "$PUSHPLUS_TOKEN" ]; then
+            if [ -n "$PUSHPLUS_TOPIC" ]; then
+              PUSHPLUS_TOPIC_JSON="$(json_escape "$PUSHPLUS_TOPIC")"
+              PUSHPLUS_PAYLOAD="{\"token\":\"$PUSHPLUS_TOKEN\",\"title\":\"$TITLE_JSON\",\"content\":\"$CONTENT_JSON\",\"template\":\"txt\",\"topic\":\"$PUSHPLUS_TOPIC_JSON\"}"
+            else
+              PUSHPLUS_PAYLOAD="{\"token\":\"$PUSHPLUS_TOKEN\",\"title\":\"$TITLE_JSON\",\"content\":\"$CONTENT_JSON\",\"template\":\"txt\"}"
+            fi
+            curl -fsS -X POST "https://www.pushplus.plus/send" \
+              -H "Content-Type: application/json" \
+              -d "$PUSHPLUS_PAYLOAD"
+            if [ "$?" -eq 0 ]; then
+              echo "PushPlus 失败告警发送成功"
+              exit 0
+            fi
+            echo "::warning::PushPlus 失败告警发送失败，继续尝试下一渠道"
+          fi
+
+          if [ -n "$SERVERCHAN3_SENDKEY" ]; then
+            SERVERCHAN3_URL="https://sctapi.ftqq.com/${SERVERCHAN3_SENDKEY}.send"
+            if [[ "$SERVERCHAN3_SENDKEY" =~ ^sctp([0-9]+)t ]]; then
+              SERVERCHAN3_URL="https://${BASH_REMATCH[1]}.push.ft07.com/send/${SERVERCHAN3_SENDKEY}.send"
+            fi
+            SERVERCHAN3_PAYLOAD="{\"title\":\"$TITLE_JSON\",\"desp\":\"$CONTENT_JSON\",\"options\":{}}"
+            curl -fsS -X POST "$SERVERCHAN3_URL" \
+              -H "Content-Type: application/json;charset=utf-8" \
+              -d "$SERVERCHAN3_PAYLOAD"
+            if [ "$?" -eq 0 ]; then
+              echo "Server 酱 3 失败告警发送成功"
+              exit 0
+            fi
+            echo "::warning::Server 酱 3 失败告警发送失败，继续尝试下一渠道"
+          fi
+
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            TELEGRAM_TEXT="$TITLE
+
+          $CONTENT"
+            TELEGRAM_ARGS=(-d "chat_id=$TELEGRAM_CHAT_ID" --data-urlencode "text=$TELEGRAM_TEXT")
+            if [ -n "$TELEGRAM_MESSAGE_THREAD_ID" ]; then
+              TELEGRAM_ARGS+=(-d "message_thread_id=$TELEGRAM_MESSAGE_THREAD_ID")
+            fi
+            curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" "${TELEGRAM_ARGS[@]}"
+            if [ "$?" -eq 0 ]; then
+              echo "Telegram 失败告警发送成功"
+              exit 0
+            fi
+            echo "::warning::Telegram 失败告警发送失败"
+          fi
+
+          echo "::warning::失败兜底通知未发送成功：未配置轻量通知渠道或所有渠道均失败"
+          exit 0

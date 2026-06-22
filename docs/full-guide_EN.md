@@ -589,10 +589,14 @@ Edit `.github/workflows/00-daily-analysis.yml`:
 ```yaml
 schedule:
   # UTC time, Beijing time = UTC + 8
-  - cron: '30 0 * * *'     # Daily 08:30 (Beijing Time)
+  - cron: '30 0 * * *'     # Primary trigger, daily 08:30 (Beijing Time)
+  - cron: '17 1 * * *'     # Backup trigger, daily 09:17 (Beijing Time)
+  - cron: '47 2 * * *'     # Second backup trigger, daily 10:47 (Beijing Time)
 ```
 
 Scheduled triggers run `python main.py --no-market-review` by default and only push short stock recommendation cards. Manual `full` runs still execute stocks plus market review, and `market-only` still runs only the market review.
+
+To reduce missed days when GitHub Actions `schedule` events are delayed or dropped, the default workflow adds two staggered backup triggers after the primary trigger. A successful scheduled run stores a deduplication marker keyed by the Beijing date; later scheduled triggers on the same day skip analysis and notification. Manual `workflow_dispatch` runs are not blocked by this marker.
 
 Common time reference:
 

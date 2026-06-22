@@ -2585,7 +2585,6 @@ class StockAnalysisPipeline:
         
         if not stock_codes:
             logger.error("未配置自选股列表，请在 .env 文件中设置 STOCK_LIST")
-            return []
         
         logger.info(f"===== 开始分析 {len(stock_codes)} 只股票 =====")
         logger.info(f"股票列表: {', '.join(stock_codes)}")
@@ -2728,6 +2727,43 @@ class StockAnalysisPipeline:
         # 保存报告到本地文件（无论是否推送通知都保存）
         if results and not dry_run:
             self._save_local_report(results, report_type)
+
+        if (
+            not dry_run
+            and send_notification
+            and not results
+            and not single_stock_notify
+            and not merge_notification
+        ):
+            try:
+                if len(stock_codes) == 0:
+                    empty_results_reason = "自选股列表为空（可能选股推荐返回空 / 全部非交易日）"
+                elif filtered_out_count > 0 and success_count == 0:
+                    empty_results_reason = f"{filtered_out_count} 只候选未达到买入推荐，已全部过滤"
+                elif fail_count == len(stock_codes) and len(stock_codes) > 0:
+                    empty_results_reason = "全部股票分析失败（数据源 / LLM 不可用）"
+                else:
+                    empty_results_reason = "未知原因，请查看 Actions 日志"
+
+                alert_content = f"⚠️ **今日分析无可用结果**\n\n触发原因：{empty_results_reason}"
+                if self.notifier.is_available():
+                    sent = self.notifier.send(
+                        alert_content,
+                        route_type="alert",
+                        severity="warning",
+                    )
+                    logger.warning(
+                        "[Pipeline] empty_results_alert sent=%s reason=%s",
+                        sent,
+                        empty_results_reason,
+                    )
+                else:
+                    logger.warning(
+                        "[Pipeline] empty_results_alert notifier_unavailable reason=%s",
+                        empty_results_reason,
+                    )
+            except Exception as exc:
+                logger.warning("[Pipeline] empty_results_alert failed: %s", exc)
 
         # 发送通知（单股推送模式下跳过汇总推送，避免重复）
         if results and send_notification and not dry_run:
