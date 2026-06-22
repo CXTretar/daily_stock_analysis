@@ -1,11 +1,9 @@
 name: 每日股票分析
 
 on:
-  # 定时触发 - 主触发为每天北京时间 08:30；备份触发用于降低 GitHub schedule 延迟或丢弃的影响。
+  # 定时触发 - 每天北京时间 07:17，避开 GitHub Actions 整点和半点高峰。
   schedule:
-    - cron: '30 0 * * *'       # 每天，UTC 00:30 = 北京时间 08:30
-    - cron: '17 1 * * *'       # 备份触发，错开整点高峰，UTC 01:17 = 北京时间 09:17
-    - cron: '47 2 * * *'       # 二次备份触发，继续错峰，UTC 02:47 = 北京时间 10:47
+    - cron: '17 23 * * *'      # UTC 23:17 = 北京时间次日 07:17
   
   # 手动触发
   workflow_dispatch:
@@ -63,9 +61,19 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.daily-run-marker.outputs.cache-hit }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$CACHE_HIT" = "true" ]; then
+          BJT_HOUR="$(TZ='Asia/Shanghai' date '+%H')"
+          BJT_MINUTE="$(TZ='Asia/Shanghai' date '+%M')"
+          BJT_TOTAL_MINUTES=$((10#$BJT_HOUR * 60 + 10#$BJT_MINUTE))
+          # 06:30-09:20 覆盖早盘前分析窗口，避免 GitHub schedule 延迟到中午后仍然推送。
+          ALLOWED_START_MINUTES=390
+          ALLOWED_END_MINUTES=560
+
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && { [ "$BJT_TOTAL_MINUTES" -lt "$ALLOWED_START_MINUTES" ] || [ "$BJT_TOTAL_MINUTES" -gt "$ALLOWED_END_MINUTES" ]; }; then
             echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "当天北京时间 $DSA_RUN_DATE 已有成功的定时分析，本次备份触发跳过。"
+            echo "当前北京时间 $(TZ='Asia/Shanghai' date '+%H:%M') 不在允许窗口 06:30-09:20，跳过延迟到达的 schedule。"
+          elif [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$CACHE_HIT" = "true" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "当天北京时间 $DSA_RUN_DATE 已有成功的定时分析，本次触发跳过。"
           else
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
