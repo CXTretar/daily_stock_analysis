@@ -232,6 +232,7 @@ class _FakeRoutedNotifier:
         self.send_to_email = MagicMock(return_value=True)
         self.send_to_ntfy = MagicMock(return_value=True)
         self.send_to_gotify = MagicMock(return_value=True)
+        self.send_to_wxsend = MagicMock(return_value=True)
 
     @staticmethod
     def _generate_dashboard_report(results):
@@ -331,6 +332,23 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
 
         mock_md2img.assert_not_called()
         pipeline.notifier.send_to_gotify.assert_called_once_with("report:000001")
+        pipeline.notifier._send_email_with_inline_image.assert_not_called()
+        pipeline.notifier._send_telegram_photo.assert_not_called()
+
+    def test_wxsend_route_uses_text_report_without_image_conversion(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.notifier = _FakeRoutedNotifier(
+            [NotificationChannel.WXSEND],
+            image_channels={"wxsend"},
+        )
+        pipeline.config = SimpleNamespace(stock_email_groups=[])
+        results = [SimpleNamespace(code="000001")]
+
+        with patch("src.md2img.markdown_to_image", return_value=b"png") as mock_md2img:
+            pipeline._send_notifications(results, ReportType.SIMPLE)
+
+        mock_md2img.assert_not_called()
+        pipeline.notifier.send_to_wxsend.assert_called_once_with("report:000001")
         pipeline.notifier._send_email_with_inline_image.assert_not_called()
         pipeline.notifier._send_telegram_photo.assert_not_called()
 
