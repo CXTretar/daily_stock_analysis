@@ -37,6 +37,7 @@ from src.notification_sender import (
     SlackSender,
     TelegramSender,
     WechatSender,
+    WxsendSender,
     WECHAT_IMAGE_MAX_BYTES,
 )
 
@@ -1191,6 +1192,45 @@ class TestServerchan3Sender(unittest.TestCase):
         sender = Serverchan3Sender(cfg)
         result = sender.send_to_serverchan3("hello")
         self.assertTrue(result)
+
+
+class TestWxsendSender(unittest.TestCase):
+    """Unit tests for WxsendSender."""
+
+    def test_send_returns_false_when_not_configured(self):
+        cfg = _config()
+        sender = WxsendSender(cfg)
+
+        result = sender.send_to_wxsend("hello")
+
+        self.assertFalse(result)
+
+    @mock.patch("src.notification_sender.wxsend_sender.requests.post")
+    def test_send_posts_worker_payload_with_authorization(self, mock_post):
+        mock_post.return_value = _response(200, {"ok": True})
+        cfg = _config(
+            wxsend_url="https://dawn-fog-6229.felixchan2017.workers.dev",
+            wxsend_token="TOKEN",
+        )
+        sender = WxsendSender(cfg)
+
+        result = sender.send_to_wxsend("hello", title="测试标题", timeout_seconds=7)
+
+        self.assertTrue(result)
+        mock_post.assert_called_once()
+        self.assertEqual(
+            mock_post.call_args.args[0],
+            "https://dawn-fog-6229.felixchan2017.workers.dev/wxsend",
+        )
+        self.assertEqual(
+            mock_post.call_args.kwargs["headers"]["Authorization"],
+            "TOKEN",
+        )
+        self.assertEqual(
+            mock_post.call_args.kwargs["json"],
+            {"title": "测试标题", "content": "hello"},
+        )
+        self.assertEqual(mock_post.call_args.kwargs["timeout"], 7)
 
 
 class TestSlackSender(unittest.TestCase):

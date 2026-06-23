@@ -66,6 +66,7 @@ from src.notification_sender import (
     SlackSender,
     TelegramSender,
     WechatSender,
+    WxsendSender,
     WECHAT_IMAGE_MAX_BYTES,
     resolve_gotify_message_endpoint,
     resolve_ntfy_endpoint,
@@ -111,6 +112,7 @@ class NotificationChannel(Enum):
     PUSHOVER = "pushover"  # Pushover（手机/桌面推送）
     NTFY = "ntfy"          # ntfy
     GOTIFY = "gotify"      # Gotify
+    WXSEND = "wxsend"      # WxSend（wxpush Worker）
     PUSHPLUS = "pushplus"  # PushPlus（国内推送服务）
     SERVERCHAN3 = "serverchan3"  # Server酱3（手机APP推送服务）
     CUSTOM = "custom"      # 自定义 Webhook
@@ -161,6 +163,7 @@ class ChannelDetector:
             NotificationChannel.PUSHOVER: "Pushover",
             NotificationChannel.NTFY: "ntfy",
             NotificationChannel.GOTIFY: "Gotify",
+            NotificationChannel.WXSEND: "WxSend",
             NotificationChannel.PUSHPLUS: "PushPlus",
             NotificationChannel.SERVERCHAN3: "Server酱3",
             NotificationChannel.CUSTOM: "自定义Webhook",
@@ -185,7 +188,8 @@ class NotificationService(
     Serverchan3Sender,
     SlackSender,
     TelegramSender,
-    WechatSender
+    WechatSender,
+    WxsendSender
 ):
     """
     通知服务
@@ -243,6 +247,7 @@ class NotificationService(
         SlackSender.__init__(self, config)
         TelegramSender.__init__(self, config)
         WechatSender.__init__(self, config)
+        WxsendSender.__init__(self, config)
 
         # 检测所有已配置的渠道
         self._available_channels = self._detect_all_channels()
@@ -572,6 +577,9 @@ class NotificationService(
         gotify_endpoint = resolve_gotify_message_endpoint(getattr(config, "gotify_url", None))
         if gotify_endpoint and (getattr(config, "gotify_token", None) or "").strip():
             channels.append(NotificationChannel.GOTIFY)
+
+        if getattr(config, "wxsend_url", None) and getattr(config, "wxsend_token", None):
+            channels.append(NotificationChannel.WXSEND)
 
         if getattr(config, "pushplus_token", None):
             channels.append(NotificationChannel.PUSHPLUS)
@@ -2190,6 +2198,8 @@ class NotificationService(
             return self.send_to_ntfy(content)
         if channel == NotificationChannel.GOTIFY:
             return self.send_to_gotify(content)
+        if channel == NotificationChannel.WXSEND:
+            return self.send_to_wxsend(content)
         if channel == NotificationChannel.PUSHPLUS:
             return self.send_to_pushplus(content)
         if channel == NotificationChannel.SERVERCHAN3:

@@ -129,6 +129,13 @@ CHANNEL_PROFILES: Dict[str, ChannelProfile] = {
         default_mode="full_report",
         supports_link=True,
     ),
+    "wxsend": ChannelProfile(
+        channel="wxsend",
+        markdown="markdown",
+        default_mode="full_report",
+        supports_link=True,
+        notes="WxSend forwards report text through the wxpush Worker /wxsend endpoint.",
+    ),
     "pushplus": ChannelProfile(
         channel="pushplus",
         markdown="markdown",

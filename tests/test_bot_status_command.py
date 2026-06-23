@@ -42,7 +42,7 @@ def test_status_command_reports_unified_llm_and_notification_channels():
     assert "LLM 渠道: deepseek" in text
     assert "自定义 Webhook: ✅" in text
     assert "Slack: ✅" in text
-    assert "PushPlus/Pushover/Server酱3: ✅" in text
+    assert "PushPlus/Pushover/Server酱3/WxSend: ✅" in text
     assert "系统就绪" in text
 
 

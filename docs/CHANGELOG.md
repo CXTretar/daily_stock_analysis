@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 通知渠道新增 WxSend wxpush Worker 推送，支持 `WXSEND_URL`、`WXSEND_TOKEN` 和 `NOTIFICATION_REPORT_CHANNELS=wxsend` 路由。
 - [修复] 报告与通知中的生成时间固定按北京时间展示，避免 UTC 运行环境显示偏早 8 小时。
 - [改进] GitHub Actions 每日股票分析改为北京时间 07:17 单次触发，并限制定时触发只在 06:30-09:20 窗口内执行，避免延迟到中午后仍然推送。
 - [修复] 每日股票分析在主流程异常失败或无可用个股结果时补充轻量告警通知，避免静默漏报。

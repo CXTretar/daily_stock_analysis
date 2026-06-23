@@ -1770,6 +1770,26 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
     @mock.patch("src.notification.get_config")
     @mock.patch("requests.post")
+    def test_send_to_wxsend_via_notification_service(
+        self, mock_post: mock.MagicMock, mock_get_config: mock.MagicMock
+    ):
+        cfg = _make_config(
+            wxsend_url="https://dawn-fog-6229.felixchan2017.workers.dev",
+            wxsend_token="TOKEN",
+        )
+        mock_get_config.return_value = cfg
+        mock_post.return_value = _make_response(200, {"ok": True})
+
+        service = NotificationService()
+        self.assertIn(NotificationChannel.WXSEND, service.get_available_channels())
+
+        ok = service.send("wxsend content")
+
+        self.assertTrue(ok)
+        mock_post.assert_called_once()
+
+    @mock.patch("src.notification.get_config")
+    @mock.patch("requests.post")
     def test_send_to_telegram_via_notification_service(
         self, mock_post: mock.MagicMock, mock_get_config: mock.MagicMock
     ):

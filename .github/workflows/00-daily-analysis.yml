@@ -346,6 +346,10 @@ jobs:
           # 方式五扩展：Gotify
           GOTIFY_URL: ${{ secrets.GOTIFY_URL }}
           GOTIFY_TOKEN: ${{ secrets.GOTIFY_TOKEN }}
+
+          # 方式五扩展：WxSend（wxpush Worker）
+          WXSEND_URL: ${{ secrets.WXSEND_URL }}
+          WXSEND_TOKEN: ${{ secrets.WXSEND_TOKEN }}
           
           # 方式六：PushPlus ⬅️ 新增！
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
@@ -555,6 +559,7 @@ jobs:
           echo "  PushPlus: $([ -n "$PUSHPLUS_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  ntfy: $([ -n "$NTFY_URL" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  Gotify: $([ -n "$GOTIFY_URL" ] && [ -n "$GOTIFY_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
+          echo "  WxSend: $([ -n "$WXSEND_URL" ] && [ -n "$WXSEND_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  企业微信: $([ -n "$WECHAT_WEBHOOK_URL" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  飞书: $( ([ -n "$FEISHU_WEBHOOK_URL" ] || ([ -n "$FEISHU_APP_ID" ] && [ -n "$FEISHU_APP_SECRET" ] && [ -n "$FEISHU_CHAT_ID" ]) ) && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "  Telegram: $([ -n "$TELEGRAM_BOT_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
@@ -634,6 +639,8 @@ jobs:
         env:
           PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
           PUSHPLUS_TOPIC: ${{ secrets.PUSHPLUS_TOPIC }}
+          WXSEND_URL: ${{ secrets.WXSEND_URL }}
+          WXSEND_TOKEN: ${{ secrets.WXSEND_TOKEN }}
           SERVERCHAN3_SENDKEY: ${{ secrets.SERVERCHAN3_SENDKEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -674,6 +681,23 @@ jobs:
               exit 0
             fi
             echo "::warning::PushPlus 失败告警发送失败，继续尝试下一渠道"
+          fi
+
+          if [ -n "$WXSEND_URL" ] && [ -n "$WXSEND_TOKEN" ]; then
+            WXSEND_ENDPOINT="${WXSEND_URL%/}"
+            if [[ "$WXSEND_ENDPOINT" != */wxsend ]]; then
+              WXSEND_ENDPOINT="${WXSEND_ENDPOINT}/wxsend"
+            fi
+            WXSEND_PAYLOAD="{\"title\":\"$TITLE_JSON\",\"content\":\"$CONTENT_JSON\"}"
+            curl -fsS -X POST "$WXSEND_ENDPOINT" \
+              -H "Authorization: $WXSEND_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$WXSEND_PAYLOAD"
+            if [ "$?" -eq 0 ]; then
+              echo "WxSend 失败告警发送成功"
+              exit 0
+            fi
+            echo "::warning::WxSend 失败告警发送失败，继续尝试下一渠道"
           fi
 
           if [ -n "$SERVERCHAN3_SENDKEY" ]; then

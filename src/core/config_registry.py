@@ -4346,6 +4346,23 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
         "docs": _DOC_FULL_GUIDE_NOTIFICATION,
         "warning_codes": ["secret_value"],
     },
+    "WXSEND_URL": {
+        "help_key": "settings.notification.chat_bots",
+        "examples": [
+            "WXSEND_URL=https://your-worker.workers.dev",
+            "WXSEND_URL=https://your-worker.workers.dev/wxsend",
+        ],
+        "docs": _DOC_FULL_GUIDE_NOTIFICATION,
+        "warning_codes": ["webhook_secret_value"],
+    },
+    "WXSEND_TOKEN": {
+        "help_key": "settings.notification.chat_bots",
+        "examples": [
+            "WXSEND_TOKEN=your_wxsend_api_token",
+        ],
+        "docs": _DOC_FULL_GUIDE_NOTIFICATION,
+        "warning_codes": ["secret_value"],
+    },
     "PUSHPLUS_TOPIC": {
         "help_key": "settings.notification.chat_bots",
         "examples": [

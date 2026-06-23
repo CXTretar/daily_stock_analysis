@@ -138,6 +138,10 @@ class StatusCommand(BotCommand):
                 and getattr(config, "pushover_api_token", None)
             )
             or getattr(config, "serverchan3_sendkey", None)
+            or (
+                getattr(config, "wxsend_url", None)
+                and getattr(config, "wxsend_token", None)
+            )
         )
         
         return status
@@ -196,7 +200,7 @@ class StatusCommand(BotCommand):
             f"• 自定义 Webhook: {icon(status['notify_custom'])}",
             f"• Discord: {icon(status['notify_discord'])}",
             f"• Slack: {icon(status['notify_slack'])}",
-            f"• PushPlus/Pushover/Server酱3: {icon(status['notify_push'])}",
+            f"• PushPlus/Pushover/Server酱3/WxSend: {icon(status['notify_push'])}",
         ])
         
         # AI 服务总体状态

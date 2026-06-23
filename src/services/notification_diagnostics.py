@@ -129,6 +129,14 @@ CHANNEL_SPECS: Tuple[NotificationChannelSpec, ...] = (
         note="GOTIFY_URL is the server base URL; the sender appends /message.",
     ),
     NotificationChannelSpec(
+        channel=NotificationChannel.WXSEND.value,
+        display_name=ChannelDetector.get_channel_name(NotificationChannel.WXSEND),
+        kind="configured",
+        minimal_keys=("WXSEND_URL", "WXSEND_TOKEN"),
+        advanced_keys=("WEBHOOK_VERIFY_SSL",),
+        note="WXSEND_URL accepts either the Worker base URL or the full /wxsend endpoint.",
+    ),
+    NotificationChannelSpec(
         channel=NotificationChannel.PUSHPLUS.value,
         display_name=ChannelDetector.get_channel_name(NotificationChannel.PUSHPLUS),
         kind="configured",
@@ -243,6 +251,8 @@ P6_CHANNEL_ACTIONS_ENV_KEYS: Tuple[str, ...] = (
     "NTFY_TOKEN",
     "GOTIFY_URL",
     "GOTIFY_TOKEN",
+    "WXSEND_URL",
+    "WXSEND_TOKEN",
 )
 
 
@@ -354,6 +364,16 @@ def run_notification_diagnostics(config: Config) -> NotificationDiagnosticResult
                     key="GOTIFY_URL",
                 )
             )
+
+    _require_pair(
+        config,
+        left_attr="wxsend_url",
+        right_attr="wxsend_token",
+        left_key="WXSEND_URL",
+        right_key="WXSEND_TOKEN",
+        channel_name="WxSend",
+        errors=errors,
+    )
 
     _require_pair(
         config,

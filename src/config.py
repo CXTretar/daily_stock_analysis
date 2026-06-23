@@ -783,6 +783,10 @@ class Config:
     # Gotify 配置（server base URL；sender 会拼接 /message）
     gotify_url: Optional[str] = None
     gotify_token: Optional[str] = None
+
+    # WxSend 配置（wxpush Cloudflare Worker；URL 支持 Worker 根地址或 /wxsend 完整地址）
+    wxsend_url: Optional[str] = None
+    wxsend_token: Optional[str] = None
     
     # 自定义 Webhook（支持多个，逗号分隔）
     # 适用于：钉钉、Discord、Slack、自建服务等任意支持 POST JSON 的 Webhook
@@ -1579,6 +1583,8 @@ class Config:
             ntfy_token=os.getenv('NTFY_TOKEN'),
             gotify_url=os.getenv('GOTIFY_URL'),
             gotify_token=os.getenv('GOTIFY_TOKEN'),
+            wxsend_url=os.getenv('WXSEND_URL'),
+            wxsend_token=os.getenv('WXSEND_TOKEN'),
             pushplus_token=os.getenv('PUSHPLUS_TOKEN'),
             pushplus_topic=os.getenv('PUSHPLUS_TOPIC'),
             serverchan3_sendkey=os.getenv('SERVERCHAN3_SENDKEY'),
@@ -2635,6 +2641,7 @@ class Config:
                 and (self.gotify_token or "").strip()
                 and _has_gotify_base_url(self.gotify_url)
             )
+            or (self.wxsend_url and self.wxsend_token)
             or self.pushplus_token
             or self.serverchan3_sendkey
             or self.custom_webhook_urls
@@ -2689,6 +2696,7 @@ class Config:
             ("DISCORD_WEBHOOK_URL", self.discord_webhook_url),
             ("SLACK_WEBHOOK_URL", self.slack_webhook_url),
             ("ASTRBOT_URL", self.astrbot_url),
+            ("WXSEND_URL", self.wxsend_url),
         ):
             _warn_if_webhook_url_invalid(field, value)
 
