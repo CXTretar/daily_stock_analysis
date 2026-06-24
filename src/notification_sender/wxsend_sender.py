@@ -5,9 +5,10 @@ WxSend 发送提醒服务
 职责：
 1. 通过 wxpush Cloudflare Worker 的 /wxsend 接口发送微信消息
 """
+import json
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 
@@ -22,6 +23,22 @@ DEFAULT_WXSEND_TIMEOUT_SECONDS = 10
 DEFAULT_WXSEND_USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+# 响应摘要仅用于定位 Worker 403 / 业务错误；限制长度避免日志写入大段 HTML 或报告正文。
+WXSEND_RESPONSE_SUMMARY_MAX_CHARS = 500
+# Worker 错误响应可能回显请求字段，常见密钥字段统一脱敏，避免泄露通知凭证。
+WXSEND_SENSITIVE_RESPONSE_KEYS = frozenset(
+    {
+        "token",
+        "authorization",
+        "access_token",
+        "api_key",
+        "apikey",
+        "key",
+        "secret",
+        "sendkey",
+        "password",
+    }
 )
 
 
@@ -96,7 +113,11 @@ class WxsendSender:
                 logger.info("WxSend 消息发送成功")
                 return True
 
-            logger.error(f"WxSend 请求失败: HTTP {response.status_code}")
+            logger.error(
+                "WxSend 请求失败: HTTP %s, response=%s",
+                response.status_code,
+                self._response_summary(response),
+            )
             return False
         except Exception as e:
             logger.error(f"发送 WxSend 消息失败: {e}")
@@ -122,12 +143,49 @@ class WxsendSender:
             return False
 
         if result.get("ok") is False or result.get("success") is False:
-            logger.error(f"WxSend 返回错误: {result}")
+            logger.error("WxSend 返回错误: %s", WxsendSender._response_summary(response, parsed=result))
             return True
 
         code = result.get("code")
         if isinstance(code, int) and code not in (0, 200):
-            logger.error(f"WxSend 返回错误: {result}")
+            logger.error("WxSend 返回错误: %s", WxsendSender._response_summary(response, parsed=result))
             return True
 
         return False
+
+    @staticmethod
+    def _response_summary(response: requests.Response, *, parsed: Optional[Any] = None) -> str:
+        """生成脱敏、截断后的响应摘要，便于排查 Worker 拒绝原因。"""
+        body: Any
+        if parsed is not None:
+            body = parsed
+        else:
+            try:
+                body = response.json()
+            except ValueError:
+                body = getattr(response, "text", "")
+
+        if isinstance(body, (dict, list)):
+            safe_body = WxsendSender._sanitize_response_body(body)
+            summary = json.dumps(safe_body, ensure_ascii=False, sort_keys=True)
+        else:
+            summary = str(body)
+
+        if len(summary) > WXSEND_RESPONSE_SUMMARY_MAX_CHARS:
+            return f"{summary[:WXSEND_RESPONSE_SUMMARY_MAX_CHARS]}...(truncated)"
+        return summary
+
+    @staticmethod
+    def _sanitize_response_body(body: Any) -> Any:
+        """递归脱敏 Worker 响应中的常见凭证字段。"""
+        if isinstance(body, dict):
+            sanitized = {}
+            for key, value in body.items():
+                if str(key).lower() in WXSEND_SENSITIVE_RESPONSE_KEYS:
+                    sanitized[key] = "******"
+                else:
+                    sanitized[key] = WxsendSender._sanitize_response_body(value)
+            return sanitized
+        if isinstance(body, list):
+            return [WxsendSender._sanitize_response_body(item) for item in body]
+        return body

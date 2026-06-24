@@ -1237,6 +1237,49 @@ class TestWxsendSender(unittest.TestCase):
         )
         self.assertEqual(mock_post.call_args.kwargs["timeout"], 7)
 
+    @mock.patch("src.notification_sender.wxsend_sender.requests.post")
+    def test_send_logs_sanitized_summary_on_http_error(self, mock_post):
+        mock_post.return_value = _response(
+            403,
+            {"error": "Forbidden", "authorization": "SECRET"},
+        )
+        cfg = _config(
+            wxsend_url="https://dawn-fog-6229.felixchan2017.workers.dev",
+            wxsend_token="TOKEN",
+        )
+        sender = WxsendSender(cfg)
+
+        with self.assertLogs("src.notification_sender.wxsend_sender", level="ERROR") as logs:
+            result = sender.send_to_wxsend("hello")
+
+        self.assertFalse(result)
+        log_output = "\n".join(logs.output)
+        self.assertIn("HTTP 403", log_output)
+        self.assertIn("Forbidden", log_output)
+        self.assertIn("******", log_output)
+        self.assertNotIn("SECRET", log_output)
+
+    @mock.patch("src.notification_sender.wxsend_sender.requests.post")
+    def test_send_logs_sanitized_summary_on_explicit_worker_failure(self, mock_post):
+        mock_post.return_value = _response(
+            200,
+            {"ok": False, "message": "token mismatch", "token": "SECRET"},
+        )
+        cfg = _config(
+            wxsend_url="https://dawn-fog-6229.felixchan2017.workers.dev",
+            wxsend_token="TOKEN",
+        )
+        sender = WxsendSender(cfg)
+
+        with self.assertLogs("src.notification_sender.wxsend_sender", level="ERROR") as logs:
+            result = sender.send_to_wxsend("hello")
+
+        self.assertFalse(result)
+        log_output = "\n".join(logs.output)
+        self.assertIn("token mismatch", log_output)
+        self.assertIn("******", log_output)
+        self.assertNotIn("SECRET", log_output)
+
 
 class TestSlackSender(unittest.TestCase):
     """Unit tests for SlackSender."""
