@@ -5,6 +5,7 @@ WxSend 发送提醒服务
 职责：
 1. 通过 wxpush Cloudflare Worker 的 /wxsend 接口发送微信消息
 """
+import hashlib
 import json
 import logging
 from datetime import datetime
@@ -26,6 +27,8 @@ DEFAULT_WXSEND_USER_AGENT = (
 )
 # 响应摘要仅用于定位 Worker 403 / 业务错误；限制长度避免日志写入大段 HTML 或报告正文。
 WXSEND_RESPONSE_SUMMARY_MAX_CHARS = 500
+# Token 指纹用于跨 GitHub Secret / Worker 配置比对；12 位足够排障且不泄露完整凭证。
+WXSEND_TOKEN_FINGERPRINT_CHARS = 12
 # Worker 错误响应可能回显请求字段，常见密钥字段统一脱敏，避免泄露通知凭证。
 WXSEND_SENSITIVE_RESPONSE_KEYS = frozenset(
     {
@@ -114,9 +117,10 @@ class WxsendSender:
                 return True
 
             logger.error(
-                "WxSend 请求失败: HTTP %s, response=%s",
+                "WxSend 请求失败: HTTP %s, response=%s, token_diag=%s",
                 response.status_code,
                 self._response_summary(response),
+                self._token_diagnostic_summary(),
             )
             return False
         except Exception as e:
@@ -131,8 +135,7 @@ class WxsendSender:
             return normalized
         return f"{normalized}/wxsend"
 
-    @staticmethod
-    def _response_explicitly_failed(response: requests.Response) -> bool:
+    def _response_explicitly_failed(self, response: requests.Response) -> bool:
         """识别常见 JSON 错误字段；未知 2xx body 按成功处理以兼容 Worker 返回。"""
         try:
             result = response.json()
@@ -143,15 +146,35 @@ class WxsendSender:
             return False
 
         if result.get("ok") is False or result.get("success") is False:
-            logger.error("WxSend 返回错误: %s", WxsendSender._response_summary(response, parsed=result))
+            logger.error(
+                "WxSend 返回错误: %s, token_diag=%s",
+                self._response_summary(response, parsed=result),
+                self._token_diagnostic_summary(),
+            )
             return True
 
         code = result.get("code")
         if isinstance(code, int) and code not in (0, 200):
-            logger.error("WxSend 返回错误: %s", WxsendSender._response_summary(response, parsed=result))
+            logger.error(
+                "WxSend 返回错误: %s, token_diag=%s",
+                self._response_summary(response, parsed=result),
+                self._token_diagnostic_summary(),
+            )
             return True
 
         return False
+
+    def _token_diagnostic_summary(self) -> str:
+        """输出不可逆 token 指纹和格式特征，用于定位 GitHub Secret 与 Worker token 不一致。"""
+        token = str(self._wxsend_token or "")
+        stripped = token.strip()
+        fingerprint = hashlib.sha256(token.encode("utf-8")).hexdigest()[:WXSEND_TOKEN_FINGERPRINT_CHARS]
+        return (
+            f"len={len(token)}, stripped_len={len(stripped)}, "
+            f"has_bearer_prefix={token.startswith('Bearer ')}, "
+            f"has_surrounding_whitespace={token != stripped}, "
+            f"sha256_12={fingerprint}"
+        )
 
     @staticmethod
     def _response_summary(response: requests.Response, *, parsed: Optional[Any] = None) -> str:

@@ -1256,8 +1256,12 @@ class TestWxsendSender(unittest.TestCase):
         log_output = "\n".join(logs.output)
         self.assertIn("HTTP 403", log_output)
         self.assertIn("Forbidden", log_output)
+        self.assertIn("token_diag=len=5", log_output)
+        self.assertIn("has_bearer_prefix=False", log_output)
+        self.assertIn(f"sha256_12={hashlib.sha256(b'TOKEN').hexdigest()[:12]}", log_output)
         self.assertIn("******", log_output)
         self.assertNotIn("SECRET", log_output)
+        self.assertNotIn("TOKEN", log_output)
 
     @mock.patch("src.notification_sender.wxsend_sender.requests.post")
     def test_send_logs_sanitized_summary_on_explicit_worker_failure(self, mock_post):
@@ -1277,8 +1281,32 @@ class TestWxsendSender(unittest.TestCase):
         self.assertFalse(result)
         log_output = "\n".join(logs.output)
         self.assertIn("token mismatch", log_output)
+        self.assertIn("token_diag=len=5", log_output)
+        self.assertIn("has_bearer_prefix=False", log_output)
+        self.assertIn(f"sha256_12={hashlib.sha256(b'TOKEN').hexdigest()[:12]}", log_output)
         self.assertIn("******", log_output)
         self.assertNotIn("SECRET", log_output)
+        self.assertNotIn("TOKEN", log_output)
+
+    @mock.patch("src.notification_sender.wxsend_sender.requests.post")
+    def test_send_token_diagnostic_marks_bearer_and_surrounding_whitespace(self, mock_post):
+        mock_post.return_value = _response(403, {"msg": "Invalid token"})
+        cfg = _config(
+            wxsend_url="https://dawn-fog-6229.felixchan2017.workers.dev",
+            wxsend_token=" Bearer SECRET ",
+        )
+        sender = WxsendSender(cfg)
+
+        with self.assertLogs("src.notification_sender.wxsend_sender", level="ERROR") as logs:
+            result = sender.send_to_wxsend("hello")
+
+        self.assertFalse(result)
+        log_output = "\n".join(logs.output)
+        self.assertIn("token_diag=len=15", log_output)
+        self.assertIn("stripped_len=13", log_output)
+        self.assertIn("has_bearer_prefix=False", log_output)
+        self.assertIn("has_surrounding_whitespace=True", log_output)
+        self.assertNotIn("Bearer SECRET", log_output)
 
 
 class TestSlackSender(unittest.TestCase):
