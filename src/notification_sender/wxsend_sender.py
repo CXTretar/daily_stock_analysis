@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 # WxSend Worker 是轻量 webhook；10 秒覆盖常见网络抖动，避免通知长时间阻塞主流程。
 DEFAULT_WXSEND_TIMEOUT_SECONDS = 10
+# Cloudflare Bot Fight Mode 可能拦截 python-requests 默认 UA；使用浏览器 UA 避免 1010 误杀。
+DEFAULT_WXSEND_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
 
 
 class WxsendSender:
@@ -73,6 +78,8 @@ class WxsendSender:
         headers = {
             "Authorization": self._wxsend_token,
             "Content-Type": "application/json",
+            "User-Agent": DEFAULT_WXSEND_USER_AGENT,
+            "Accept": "application/json,text/plain,*/*",
         }
 
         try:

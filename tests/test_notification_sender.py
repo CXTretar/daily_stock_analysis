@@ -1226,6 +1226,11 @@ class TestWxsendSender(unittest.TestCase):
             mock_post.call_args.kwargs["headers"]["Authorization"],
             "TOKEN",
         )
+        self.assertIn("Mozilla/5.0", mock_post.call_args.kwargs["headers"]["User-Agent"])
+        self.assertEqual(
+            mock_post.call_args.kwargs["headers"]["Accept"],
+            "application/json,text/plain,*/*",
+        )
         self.assertEqual(
             mock_post.call_args.kwargs["json"],
             {"title": "测试标题", "content": "hello"},
